@@ -41,7 +41,28 @@ function create_account() {
     echo "User '${password}' added, expires in $days day(s)."
 
     jq --arg pass "$password" '.auth.config += [$pass]' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
-    echo "Configuration updated."
+    
+    # --- Display Account Information ---
+    # Get host information
+    CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p')
+    if [ "$CERT_CN" == "zivpn" ]; then
+        HOST=$(curl -s ifconfig.me)
+    else
+        HOST=$CERT_CN
+    fi
+
+    # Format expiry date
+    EXPIRE_FORMATTED=$(date -d "@$expiry_date" +"%d %B %Y")
+    
+    clear
+    echo "🔹Informasi Akun zivpn Anda🔹"
+    echo "┌─────────────────────"
+    echo "│ Host: $HOST"
+    echo "│ Pass: $password"
+    echo "│ Expire: $EXPIRE_FORMATTED"
+    echo "└─────────────────────"
+    echo "♨ᵗᵉʳⁱᵐᵃᵏᵃˢⁱʰ ᵗᵉˡᵃʰ ᵐᵉⁿᵍᵍᵘⁿᵃᵏᵃⁿ ˡᵃʸᵃⁿᵃⁿ ᵏᵃᵐⁱ♨"
+    
     restart_zivpn
 }
 
@@ -158,9 +179,9 @@ function run_setup() {
     # --- Setting up Advanced Management ---
     echo "--- Setting up Advanced Management ---"
 
-    if ! command -v jq &> /dev/null; then
-        echo "Installing jq..."
-        apt-get update && apt-get install -y jq
+    if ! command -v jq &> /dev/null || ! command -v curl &> /dev/null; then
+        echo "Installing dependencies (jq, curl)..."
+        apt-get update && apt-get install -y jq curl
     fi
 
     echo "Clearing initial password(s) set during base installation..."
