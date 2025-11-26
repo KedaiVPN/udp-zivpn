@@ -19,8 +19,8 @@ rm /usr/local/bin/zivpn 1> /dev/null 2> /dev/null
 rm /usr/local/bin/zivpn-manager 1> /dev/null 2> /dev/null
 rm /usr/local/bin/zivpn_helper.sh 1> /dev/null 2> /dev/null
 
-# Remove cron job
-(crontab -l 2>/dev/null | grep -v "/etc/zivpn/expire_check.sh") | crontab -
+# Remove cron jobs
+(crontab -l 2>/dev/null | grep -v "zivpn") | crontab -
 
 # Remove system integration from shell profiles
 PROFILE_FILES=("/root/.bashrc" "/root/.bash_profile")
