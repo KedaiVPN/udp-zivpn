@@ -210,6 +210,26 @@ EOF
 
     restart_zivpn
 
+    # --- System Integration ---
+    echo "--- Integrating management script into the system ---"
+    cp "$0" /usr/local/bin/zivpn-manager
+    chmod +x /usr/local/bin/zivpn-manager
+
+    PROFILE_FILE="/root/.bashrc"
+    if [ -f "/root/.bash_profile" ]; then
+        PROFILE_FILE="/root/.bash_profile"
+    fi
+
+    ALIAS_CMD="alias menu='/usr/local/bin/zivpn-manager'"
+    AUTORUN_CMD="/usr/local/bin/zivpn-manager"
+
+    # Add alias and autorun command if they don't exist
+    grep -qF "$ALIAS_CMD" "$PROFILE_FILE" || echo "$ALIAS_CMD" >> "$PROFILE_FILE"
+    grep -qF "$AUTORUN_CMD" "$PROFILE_FILE" || echo "$AUTORUN_CMD" >> "$PROFILE_FILE"
+
+    echo "The 'menu' command is now available."
+    echo "The management menu will now open automatically on login."
+    
     echo "-----------------------------------------------------"
     echo "Advanced management setup complete."
     echo "A temporary account has been created to ensure service starts correctly:"
