@@ -133,10 +133,10 @@ function install_zivpn() {
     sudo apt-get update && apt-get upgrade -y && sudo apt-get install -y jq
     systemctl stop zivpn.service 1> /dev/null 2> /dev/null
     echo -e "Downloading UDP Service"
-    wget https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-amd64 -O /usr/local/bin/zivpn 1> /dev/null 2> /dev/null
+    wget https://github.com/kedaivpn/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-amd64 -O /usr/local/bin/zivpn 1> /dev/null 2> /dev/null
     chmod +x /usr/local/bin/zivpn
     mkdir /etc/zivpn 1> /dev/null 2> /dev/null
-    wget https://raw.githubusercontent.com/zahidbd2/udp-zivpn/main/config.json -O /etc/zivpn/config.json 1> /dev/null 2> /dev/null
+    wget https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/config.json -O /etc/zivpn/config.json 1> /dev/null 2> /dev/null
 
     echo "Generating cert files:"
     openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 -subj "/C=US/ST=California/L=Los Angeles/O=Example Corp/OU=IT Department/CN=zivpn" -keyout "/etc/zivpn/zivpn.key" -out "/etc/zivpn/zivpn.crt"
