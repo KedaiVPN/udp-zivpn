@@ -92,9 +92,14 @@ function renew_account() {
 
     local current_expiry_date
     current_expiry_date=$(echo "$user_line" | cut -d: -f2)
+
+    if ! [[ "$current_expiry_date" =~ ^[0-9]+$ ]]; then
+        echo "Error: Corrupted database entry for user '$password'. Cannot renew."
+        return
+    fi
     
-    local new_expiry_date
-    new_expiry_date=$(date -d "@$current_expiry_date + $days days" +%s)
+    local seconds_to_add=$((days * 86400))
+    local new_expiry_date=$((current_expiry_date + seconds_to_add))
     
     sed -i "s/^${password}:.*/${password}:${new_expiry_date}/" "$db_file"
 
