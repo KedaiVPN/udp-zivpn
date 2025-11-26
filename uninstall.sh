@@ -17,6 +17,7 @@ killall zivpn 1> /dev/null 2> /dev/null
 rm -rf /etc/zivpn 1> /dev/null 2> /dev/null
 rm /usr/local/bin/zivpn 1> /dev/null 2> /dev/null
 rm /usr/local/bin/zivpn-manager 1> /dev/null 2> /dev/null
+rm /usr/local/bin/zivpn_helper.sh 1> /dev/null 2> /dev/null
 
 # Remove cron job
 (crontab -l 2>/dev/null | grep -v "/etc/zivpn/expire_check.sh") | crontab -
