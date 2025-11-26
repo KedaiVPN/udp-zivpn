@@ -67,6 +67,60 @@ function create_account() {
     restart_zivpn
 }
 
+function renew_account() {
+    echo "--- Renew Account ---"
+    read -p "Enter password to renew: " password
+    if [ -z "$password" ]; then
+        echo "Password cannot be empty."
+        return
+    fi
+
+    read -p "Enter number of days to extend: " days
+    if ! [[ "$days" =~ ^[1-9][0-9]*$ ]]; then
+        echo "Invalid number of days. Please enter a positive number."
+        return
+    fi
+
+    local db_file="/etc/zivpn/users.db"
+    local user_line
+    user_line=$(grep "^${password}:" "$db_file")
+
+    if [ -z "$user_line" ]; then
+        echo "Password '${password}' not found."
+        return
+    fi
+
+    local current_expiry_date
+    current_expiry_date=$(echo "$user_line" | cut -d: -f2)
+    local current_date
+    current_date=$(date +%s)
+    
+    local base_date
+    if [ "$current_expiry_date" -lt "$current_date" ]; then
+        # If expired, extend from today
+        base_date=$current_date
+    else
+        # If not expired, extend from the current expiry date
+        base_date=$current_expiry_date
+    fi
+
+    local new_expiry_date
+    new_expiry_date=$(date -d "@$base_date + $days days" +%s)
+    
+    # Update the user's expiry date in the database
+    sed -i "s/^${password}:.*/${password}:${new_expiry_date}/" "$db_file"
+
+    # Ensure user is active in config.json
+    if ! jq -e --arg pass "$password" '.auth.config | any(. == $pass)' /etc/zivpn/config.json > /dev/null; then
+        jq --arg pass "$password" '.auth.config += [$pass]' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
+    fi
+
+    local new_expiry_formatted
+    new_expiry_formatted=$(date -d "@$new_expiry_date" +"%d %B %Y")
+    echo "Account '${password}' has been renewed. New expiry date: ${new_expiry_formatted}."
+    restart_zivpn
+}
+
 function delete_account() {
     echo "--- Delete Account ---"
     read -p "Enter password to delete: " password
@@ -188,20 +242,22 @@ function show_menu() {
     echo "ZIVPN Account Manager"
     echo "---------------------"
     echo "1. Create Account"
-    echo "2. Delete Account"
-    echo "3. Change Domain"
-    echo "4. List Accounts"
-    echo "5. Backup / Restore"
+    echo "2. Renew Account"
+    echo "3. Delete Account"
+    echo "4. Change Domain"
+    echo "5. List Accounts"
+    echo "6. Backup / Restore"
     echo "0. Exit"
     echo "---------------------"
-    read -p "Enter your choice [0-5]: " choice
+    read -p "Enter your choice [0-6]: " choice
 
     case $choice in
         1) create_account ;;
-        2) delete_account ;;
-        3) change_domain ;;
-        4) list_accounts ;;
-        5) show_backup_menu ;;
+        2) renew_account ;;
+        3) delete_account ;;
+        4) change_domain ;;
+        5) list_accounts ;;
+        6) show_backup_menu ;;
         0) exit 0 ;;
         *) echo "Invalid option. Please try again." ;;
     esac
@@ -255,23 +311,43 @@ DB_FILE="/etc/zivpn/users.db"
 CONFIG_FILE="/etc/zivpn/config.json"
 TMP_DB_FILE="${DB_FILE}.tmp"
 CURRENT_DATE=$(date +%s)
-USERS_REMOVED=false
+THREE_DAYS_AGO=$((CURRENT_DATE - 259200)) # 3 days in seconds
+SERVICE_RESTART_NEEDED=false
+
 if [ ! -f "$DB_FILE" ]; then exit 0; fi
 > "$TMP_DB_FILE"
+
+# Process users, deactivating expired ones and deleting old ones
 while IFS=':' read -r password expiry_date; do
-    if [[ -n "$password" ]]; then
-        if [ "$expiry_date" -le "$CURRENT_DATE" ]; then
-            echo "User '${password}' has expired. Removing."
+    if [[ -z "$password" ]]; then continue; fi
+
+    # Check if user is expired
+    if [ "$expiry_date" -le "$CURRENT_DATE" ]; then
+        # Deactivate by removing from config.json if they are still there
+        if jq -e --arg pass "$password" '.auth.config | any(. == $pass)' "$CONFIG_FILE" > /dev/null; then
+            echo "User '${password}' has expired. Deactivating."
             jq --arg pass "$password" 'del(.auth.config[] | select(. == $pass))' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
-            USERS_REMOVED=true
+            SERVICE_RESTART_NEEDED=true
+        fi
+        
+        # Check if user expired more than 3 days ago
+        if [ "$expiry_date" -le "$THREE_DAYS_AGO" ]; then
+            echo "User '${password}' expired more than 3 days ago. Permanently deleting."
+            # Do not write them to the new db file, effectively deleting them
         else
+            # Keep them in the db file for the grace period
             echo "${password}:${expiry_date}" >> "$TMP_DB_FILE"
         fi
+    else
+        # User is not expired, keep them
+        echo "${password}:${expiry_date}" >> "$TMP_DB_FILE"
     fi
 done < "$DB_FILE"
+
 mv "$TMP_DB_FILE" "$DB_FILE"
-if [ "$USERS_REMOVED" = true ]; then
-    echo "Restarting zivpn service due to user removal."
+
+if [ "$SERVICE_RESTART_NEEDED" = true ]; then
+    echo "Restarting zivpn service due to user deactivation."
     systemctl restart zivpn.service
 fi
 exit 0
