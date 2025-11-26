@@ -36,22 +36,23 @@ function create_account() {
         return
     fi
 
-    local expiry_date=$(date -d "+$days days" +%s)
+    local expiry_date
+    expiry_date=$(date -d "+$days days" +%s)
     echo "${password}:${expiry_date}" >> "$db_file"
-    echo "User '${password}' added, expires in $days day(s)."
-
+    
     jq --arg pass "$password" '.auth.config += [$pass]' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
     
     # --- Display Account Information ---
-    # Get host information
+    local CERT_CN
     CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p')
+    local HOST
     if [ "$CERT_CN" == "zivpn" ]; then
         HOST=$(curl -s ifconfig.me)
     else
         HOST=$CERT_CN
     fi
 
-    # Format expiry date
+    local EXPIRE_FORMATTED
     EXPIRE_FORMATTED=$(date -d "@$expiry_date" +"%d %B %Y")
     
     clear
@@ -119,7 +120,8 @@ function list_accounts() {
         return
     fi
 
-    local current_date=$(date +%s)
+    local current_date
+    current_date=$(date +%s)
     printf "%-20s | %s\n" "Password" "Expires in (days)"
     echo "------------------------------------------"
     while IFS=':' read -r password expiry_date; do
@@ -136,6 +138,24 @@ function list_accounts() {
     echo "------------------------------------------"
 }
 
+function show_backup_menu() {
+    clear
+    echo "Backup / Restore Menu"
+    echo "---------------------"
+    echo "1. Backup Data"
+    echo "2. Restore Data"
+    echo "0. Back to Main Menu"
+    echo "---------------------"
+    read -p "Enter your choice [0-2]: " choice
+    
+    case $choice in
+        1) /usr/local/bin/zivpn_helper.sh backup ;;
+        2) /usr/local/bin/zivpn_helper.sh restore ;;
+        0) return ;;
+        *) echo "Invalid option." ;;
+    esac
+}
+
 function show_menu() {
     clear
     echo "ZIVPN Account Manager"
@@ -144,16 +164,18 @@ function show_menu() {
     echo "2. Delete Account"
     echo "3. Change Domain"
     echo "4. List Accounts"
-    echo "5. Exit"
+    echo "5. Backup / Restore"
+    echo "0. Exit"
     echo "---------------------"
-    read -p "Enter your choice [1-5]: " choice
+    read -p "Enter your choice [0-5]: " choice
 
     case $choice in
         1) create_account ;;
         2) delete_account ;;
         3) change_domain ;;
         4) list_accounts ;;
-        5) exit 0 ;;
+        5) show_backup_menu ;;
+        0) exit 0 ;;
         *) echo "Invalid option. Please try again." ;;
     esac
 }
@@ -163,26 +185,29 @@ function run_setup() {
     # --- Run Base Installation ---
     echo "--- Starting Base Installation ---"
     wget -O zi.sh https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/zi.sh
-    if [ $? -ne 0 ]; then
-        echo "Failed to download the base installer. Aborting."
-        exit 1
-    fi
+    if [ $? -ne 0 ]; then echo "Failed to download base installer. Aborting."; exit 1; fi
     chmod +x zi.sh
     ./zi.sh
-    if [ $? -ne 0 ]; then
-        echo "Base installation script failed. Aborting."
-        exit 1
-    fi
+    if [ $? -ne 0 ]; then echo "Base installation script failed. Aborting."; exit 1; fi
     rm zi.sh
     echo "--- Base Installation Complete ---"
 
     # --- Setting up Advanced Management ---
     echo "--- Setting up Advanced Management ---"
 
-    if ! command -v jq &> /dev/null || ! command -v curl &> /dev/null; then
-        echo "Installing dependencies (jq, curl)..."
-        apt-get update && apt-get install -y jq curl
+    if ! command -v jq &> /dev/null || ! command -v curl &> /dev/null || ! command -v zip &> /dev/null; then
+        echo "Installing dependencies (jq, curl, zip)..."
+        apt-get update && apt-get install -y jq curl zip
     fi
+
+    # Download helper script from repository
+    echo "Downloading helper script..."
+    wget -O /usr/local/bin/zivpn_helper.sh https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/zivpn_helper.sh
+    if [ $? -ne 0 ]; then
+        echo "Failed to download helper script. Aborting."
+        exit 1
+    fi
+    chmod +x /usr/local/bin/zivpn_helper.sh
 
     echo "Clearing initial password(s) set during base installation..."
     jq '.auth.config = []' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
@@ -224,7 +249,6 @@ if [ "$USERS_REMOVED" = true ]; then
 fi
 exit 0
 EOF
-
     chmod +x /etc/zivpn/expire_check.sh
     CRON_JOB="0 0 * * * /etc/zivpn/expire_check.sh"
     (crontab -l 2>/dev/null | grep -Fq "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
@@ -237,14 +261,11 @@ EOF
     chmod +x /usr/local/bin/zivpn-manager
 
     PROFILE_FILE="/root/.bashrc"
-    if [ -f "/root/.bash_profile" ]; then
-        PROFILE_FILE="/root/.bash_profile"
-    fi
-
+    if [ -f "/root/.bash_profile" ]; then PROFILE_FILE="/root/.bash_profile"; fi
+    
     ALIAS_CMD="alias menu='/usr/local/bin/zivpn-manager'"
     AUTORUN_CMD="/usr/local/bin/zivpn-manager"
 
-    # Add alias and autorun command if they don't exist
     grep -qF "$ALIAS_CMD" "$PROFILE_FILE" || echo "$ALIAS_CMD" >> "$PROFILE_FILE"
     grep -qF "$AUTORUN_CMD" "$PROFILE_FILE" || echo "$AUTORUN_CMD" >> "$PROFILE_FILE"
 
@@ -253,10 +274,7 @@ EOF
     
     echo "-----------------------------------------------------"
     echo "Advanced management setup complete."
-    echo "A temporary account has been created to ensure service starts correctly:"
-    echo "Password: ${RANDOM_PASS}"
-    echo "Expires in: 24 hours"
-    echo "Please use the menu to create your permanent account(s)."
+    echo "Password for temporary account (expires 24h): ${RANDOM_PASS}"
     echo "-----------------------------------------------------"
     read -p "Press Enter to continue to the management menu..."
 }
