@@ -138,19 +138,46 @@ function list_accounts() {
     echo "------------------------------------------"
 }
 
+function setup_auto_backup() {
+    echo "--- Configure Auto Backup ---"
+    if [ ! -f "/etc/zivpn/telegram.conf" ]; then
+        echo "Telegram is not configured. Please run a manual backup once to set it up."
+        return
+    fi
+
+    read -p "Enter backup interval in hours (e.g., 6, 12, 24). Enter 0 to disable: " interval
+    if ! [[ "$interval" =~ ^[0-9]+$ ]]; then
+        echo "Invalid input. Please enter a number."
+        return
+    fi
+
+    # Remove any existing auto backup cron job to prevent duplicates
+    (crontab -l 2>/dev/null | grep -v "# zivpn-auto-backup") | crontab -
+
+    if [ "$interval" -gt 0 ]; then
+        local cron_schedule="0 */${interval} * * *"
+        (crontab -l 2>/dev/null; echo "${cron_schedule} /usr/local/bin/zivpn_helper.sh backup >/dev/null 2>&1 # zivpn-auto-backup") | crontab -
+        echo "Auto backup scheduled to run every ${interval} hour(s)."
+    else
+        echo "Auto backup has been disabled."
+    fi
+}
+
 function show_backup_menu() {
     clear
     echo "Backup / Restore Menu"
     echo "---------------------"
     echo "1. Backup Data"
     echo "2. Restore Data"
+    echo "3. Auto Backup"
     echo "0. Back to Main Menu"
     echo "---------------------"
-    read -p "Enter your choice [0-2]: " choice
+    read -p "Enter your choice [0-3]: " choice
     
     case $choice in
         1) /usr/local/bin/zivpn_helper.sh backup ;;
         2) /usr/local/bin/zivpn_helper.sh restore ;;
+        3) setup_auto_backup ;;
         0) return ;;
         *) echo "Invalid option." ;;
     esac
@@ -199,7 +226,7 @@ function run_setup() {
         echo "Installing dependencies (jq, curl, zip)..."
         apt-get update && apt-get install -y jq curl zip
     fi
-
+    
     # Download helper script from repository
     echo "Downloading helper script..."
     wget -O /usr/local/bin/zivpn_helper.sh https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/zivpn_helper.sh
@@ -250,8 +277,9 @@ fi
 exit 0
 EOF
     chmod +x /etc/zivpn/expire_check.sh
-    CRON_JOB="0 0 * * * /etc/zivpn/expire_check.sh"
-    (crontab -l 2>/dev/null | grep -Fq "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+    CRON_JOB_EXPIRY="0 0 * * * /etc/zivpn/expire_check.sh # zivpn-expiry-check"
+    (crontab -l 2>/dev/null | grep -v "# zivpn-expiry-check") | crontab -
+    (crontab -l 2>/dev/null; echo "$CRON_JOB_EXPIRY") | crontab -
 
     restart_zivpn
 
