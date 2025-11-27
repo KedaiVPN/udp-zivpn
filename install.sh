@@ -293,7 +293,7 @@ function show_backup_menu() {
 
 function show_menu() {
     clear
-    figlet "UDP ZIVPN" | lolcat
+    figlet "UDP - ZIVPN" | lolcat
     
     echo -e "${YELLOW}╔══════════════════// ${RED}KEDAI SSH${YELLOW} //═══════════════════╗${NC}"
     echo -e "${YELLOW}║                                                    ║${NC}"
