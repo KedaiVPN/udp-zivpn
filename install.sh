@@ -301,22 +301,18 @@ function _draw_service_status() {
     status_output="${CYAN}Service: ${status_color}${status_text}${NC}"
     
     # Center the text
-    local menu_width=53
-    local text_len_raw
-    text_len_raw=$(echo -e "$status_output" | wc -c)
-    text_len_raw=$((text_len_raw - 1))
+    local menu_width=55  # Total width of the menu box including borders
     local text_len_visible
     text_len_visible=$(echo -e "$status_output" | sed 's/\x1b\[[0-9;]*m//g' | wc -c)
     text_len_visible=$((text_len_visible - 1))
-    
+
     local padding_total=$((menu_width - text_len_visible))
     local padding_left=$((padding_total / 2))
     local padding_right=$((padding_total - padding_left))
-
-    echo -e "${YELLOW}╔════════════════════════════════════════════════════╗${NC}"
-    echo -e "${YELLOW}║$(printf '%*s' $padding_left)${status_output}$(printf '%*s' $padding_right)${YELLOW}║${NC}\n"
-    echo -e "${YELLOW}╔════════════════════════════════════════════════════╗${NC}"
-
+    
+    echo -e "${YELLOW}╠════════════════════════════════════════════════════╣${NC}"
+    echo -e "$(printf '%*s' $padding_left)${status_output}$(printf '%*s' $padding_right)"
+    echo -e "${YELLOW}╠════════════════════════════════════════════════════╣${NC}"
 }
 
 function setup_auto_backup() {
@@ -389,7 +385,7 @@ function show_menu() {
     clear
     figlet "UDP ZIVPN" | lolcat
     
-    echo -e "${YELLOW}╔══════════════════// ${CYAN}KEDAI SSH${YELLOW} //═══════════════════╗${NC}"
+    echo -e "${YELLOW}╔══════════════════// ${RED}KEDAI SSH${YELLOW} //═══════════════════╗${NC}"
     _draw_info_panel
     _draw_service_status
     echo -e "${YELLOW}║                                                    ║${NC}"
