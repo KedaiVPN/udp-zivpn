@@ -381,7 +381,7 @@ fi
 exit 0
 EOF
     chmod +x /etc/zivpn/expire_check.sh
-    CRON_JOB_EXPIRY="0 0 * * * /etc/zivpn/expire_check.sh # zivpn-expiry-check"
+    CRON_JOB_EXPIRY="* * * * * /etc/zivpn/expire_check.sh # zivpn-expiry-check"
     (crontab -l 2>/dev/null | grep -v "# zivpn-expiry-check") | crontab -
     (crontab -l 2>/dev/null; echo "$CRON_JOB_EXPIRY") | crontab -
 
@@ -412,11 +412,18 @@ EOF
 }
 
 # --- Main Script ---
-if [ ! -f "/etc/systemd/system/zivpn.service" ]; then
-    run_setup
-fi
+function main() {
+    if [ ! -f "/etc/systemd/system/zivpn.service" ]; then
+        run_setup
+    fi
 
-while true; do
-    show_menu
-    read -p "Press Enter to return to the menu..."
-done
+    while true; do
+        show_menu
+        read -p "Press Enter to return to the menu..."
+    done
+}
+
+# Execute main function only when script is run directly, not sourced
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main
+fi
