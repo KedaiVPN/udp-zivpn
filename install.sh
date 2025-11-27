@@ -6,6 +6,8 @@
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 BOLD_WHITE='\033[1;37m'
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
 # --- Pre-flight Checks ---
@@ -272,9 +274,43 @@ function _draw_info_panel() {
     fi
 
     # --- Print Panel ---
-    printf "  ${BOLD_WHITE}%-25s %-25s${NC}\n" "OS: ${os_info}" "ISP: ${isp_info}"
-    printf "  ${BOLD_WHITE}%-25s %-25s${NC}\n" "IP: ${ip_info}" "Host: ${host_info}"
-    printf "  ${BOLD_WHITE}%-25s %-25s${NC}\n" "Today: ${bw_today}" "Month: ${bw_month}"
+    printf "  ${RED}%-7s${BOLD_WHITE}%-18s ${RED}%-6s${BOLD_WHITE}%-19s${NC}\n" "OS:" "${os_info}" "ISP:" "${isp_info}"
+    printf "  ${RED}%-7s${BOLD_WHITE}%-18s ${RED}%-6s${BOLD_WHITE}%-19s${NC}\n" "IP:" "${ip_info}" "Host:" "${host_info}"
+    printf "  ${RED}%-7s${BOLD_WHITE}%-18s ${RED}%-6s${BOLD_WHITE}%-19s${NC}\n" "Today:" "${bw_today}" "Month:" "${bw_month}"
+}
+
+function _draw_service_status() {
+    local status_text status_color status_output
+    local service_status
+    service_status=$(systemctl is-active zivpn.service 2>/dev/null)
+
+    if [ "$service_status" = "active" ]; then
+        status_text="Running"
+        status_color="${GREEN}"
+    elif [ "$service_status" = "inactive" ]; then
+        status_text="Stopped"
+        status_color="${RED}"
+    elif [ "$service_status" = "failed" ]; then
+        status_text="Error"
+        status_color="${RED}"
+    else
+        status_text="Unknown"
+        status_color="${RED}"
+    fi
+
+    status_output="${CYAN}Service: ${status_color}${status_text}${NC}"
+    
+    # Center the text
+    local menu_width=53
+    local text_len
+    text_len=$(echo -e "$status_output" | sed 's/\\033\[[0-9;]*m//g' | wc -c)
+    text_len=$((text_len -1)) # Adjust for wc behavior
+    local padding=$(((menu_width - text_len) / 2))
+    
+    echo -e "${YELLOW}║════════════════════════════════════════════════════║${NC}"
+    printf "${YELLOW}║%${padding}s${NC}%s%*s${YELLOW}║${NC}\n" "" "$status_output" $((menu_width - padding - text_len)) ""
+    echo -e "${YELLOW}║════════════════════════════════════════════════════║${NC}"
+
 }
 
 function setup_auto_backup() {
@@ -349,7 +385,7 @@ function show_menu() {
     
     echo -e "${YELLOW}╔══════════════════// ${RED}KEDAI SSH${YELLOW} //═══════════════════╗${NC}"
     _draw_info_panel
-    echo -e "${YELLOW}║════════════════════════════════════════════════════║${NC}"
+    _draw_service_status
     echo -e "${YELLOW}║                                                    ║${NC}"
     echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Create Account                                ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Renew Account                                 ${YELLOW}║${NC}"
