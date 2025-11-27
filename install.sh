@@ -238,6 +238,45 @@ function list_accounts() {
     read -p "Press Enter to return to the menu..."
 }
 
+function _draw_info_panel() {
+    # --- Fetch Data ---
+    local os_info isp_info ip_info host_info bw_today bw_month
+
+    os_info=$( (hostnamectl 2>/dev/null | grep "Operating System" | cut -d: -f2 | sed 's/^[ \t]*//') || echo "N/A" )
+    os_info=${os_info:-"N/A"}
+
+    local ip_data
+    ip_data=$(curl -s ipinfo.io)
+    ip_info=$(echo "$ip_data" | jq -r '.ip // "N/A"')
+    isp_info=$(echo "$ip_data" | jq -r '.org // "N/A"')
+    ip_info=${ip_info:-"N/A"}
+    isp_info=${isp_info:-"N/A"}
+
+    local CERT_CN
+    CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p' 2>/dev/null || echo "")
+    if [ "$CERT_CN" == "zivpn" ] || [ -z "$CERT_CN" ]; then
+        host_info=$ip_info
+    else
+        host_info=$CERT_CN
+    fi
+    host_info=${host_info:-"N/A"}
+
+    if command -v vnstat &> /dev/null && vnstat --version &> /dev/null; then
+        bw_today=$(vnstat -d | grep "today" | awk '{print $8 $9}' | sed 's/iB//g' || echo "N/A")
+        bw_month=$(vnstat -m | grep "$(date +'%b ''%y')" | awk '{print $6 $7}' | sed 's/iB//g' || echo "N/A")
+        bw_today=${bw_today:-"N/A"}
+        bw_month=${bw_month:-"N/A"}
+    else
+        bw_today="N/A"
+        bw_month="N/A"
+    fi
+
+    # --- Print Panel ---
+    printf "  ${BOLD_WHITE}%-25s %-25s${NC}\n" "OS: ${os_info}" "ISP: ${isp_info}"
+    printf "  ${BOLD_WHITE}%-25s %-25s${NC}\n" "IP: ${ip_info}" "Host: ${host_info}"
+    printf "  ${BOLD_WHITE}%-25s %-25s${NC}\n" "Today: ${bw_today}" "Month: ${bw_month}"
+}
+
 function setup_auto_backup() {
     echo "--- Configure Auto Backup ---"
     if [ ! -f "/etc/zivpn/telegram.conf" ]; then
@@ -309,6 +348,8 @@ function show_menu() {
     figlet "UDP ZIVPN" | lolcat
     
     echo -e "${YELLOW}╔══════════════════// ${RED}KEDAI SSH${YELLOW} //═══════════════════╗${NC}"
+    _draw_info_panel
+    echo -e "${YELLOW}║════════════════════════════════════════════════════║${NC}"
     echo -e "${YELLOW}║                                                    ║${NC}"
     echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Create Account                                ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Renew Account                                 ${YELLOW}║${NC}"
@@ -349,9 +390,26 @@ function run_setup() {
     # --- Setting up Advanced Management ---
     echo "--- Setting up Advanced Management ---"
 
-    if ! command -v jq &> /dev/null || ! command -v curl &> /dev/null || ! command -v zip &> /dev/null || ! command -v figlet &> /dev/null || ! command -v lolcat &> /dev/null; then
-        echo "Installing dependencies (jq, curl, zip, figlet, lolcat)..."
-        apt-get update && apt-get install -y jq curl zip figlet lolcat
+    if ! command -v jq &> /dev/null || ! command -v curl &> /dev/null || ! command -v zip &> /dev/null || ! command -v figlet &> /dev/null || ! command -v lolcat &> /dev/null || ! command -v vnstat &> /dev/null; then
+        echo "Installing dependencies (jq, curl, zip, figlet, lolcat, vnstat)..."
+        apt-get update && apt-get install -y jq curl zip figlet lolcat vnstat
+    fi
+
+    # --- vnstat setup ---
+    echo "Configuring vnstat for bandwidth monitoring..."
+    local net_interface
+    net_interface=$(ip -o -4 route show to default | awk '{print $5}' | head -n 1)
+    if [ -n "$net_interface" ]; then
+        echo "Detected network interface: $net_interface"
+        # Wait for the service to be available after installation
+        sleep 2
+        systemctl stop vnstat
+        vnstat -u -i "$net_interface" --force
+        systemctl enable vnstat
+        systemctl start vnstat
+        echo "vnstat setup complete for interface $net_interface."
+    else
+        echo "Warning: Could not automatically detect network interface for vnstat."
     fi
     
     # Download helper script from repository
