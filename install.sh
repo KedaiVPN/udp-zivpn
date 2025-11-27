@@ -251,12 +251,12 @@ function setup_auto_backup() {
 
 function create_account() {
     clear
-    echo -e "${YELLOW}╔══════════════════// ${RED}Create Account${YELLOW} \\\\═══════════════════╗${NC}"
-    echo -e "${YELLOW}║                                                      ║${NC}"
+    echo -e "${YELLOW}╔════════════════// ${RED}Create Account${YELLOW} \\═════════════════╗${NC}"
+    echo -e "${YELLOW}║                                                    ║${NC}"
     echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Create Zivpn (Manual)                         ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Trial Zivpn (Auto)                            ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Back to Main Menu                             ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║                                                      ║${NC}"
+    echo -e "${YELLOW}║                                                    ║${NC}"
     echo -e "${YELLOW}╚════════════════════════════════════════════════════╝${NC}"
     
     read -p "Enter your choice [0-2]: " choice
@@ -271,7 +271,7 @@ function create_account() {
 
 function show_backup_menu() {
     clear
-    echo -e "${YELLOW}╔══════════════════// ${RED}Backup / Restore Menu${YELLOW} \\\\═══════════════════╗${NC}"
+    echo -e "${YELLOW}╔════════════════// ${RED}Backup/Restore Menu${YELLOW} \\═════════════════╗${NC}"
     echo -e "${YELLOW}║                                                      ║${NC}"
     echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Backup Data                                   ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Restore Data                                  ${YELLOW}║${NC}"
@@ -295,8 +295,8 @@ function show_menu() {
     clear
     figlet "ZIVPN" | lolcat
     
-    echo -e "${YELLOW}╔══════════════════// ${RED}KEDAI SSH${YELLOW} \\\\═══════════════════╗${NC}"
-    echo -e "${YELLOW}║                                                      ║${NC}"
+    echo -e "${YELLOW}╔══════════════════// ${RED}KEDAI SSH${YELLOW} \\═══════════════════╗${NC}"
+    echo -e "${YELLOW}║                                                    ║${NC}"
     echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Create Account                                ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Renew Account                                 ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}3)${NC} ${BOLD_WHITE}Delete Account                                ${YELLOW}║${NC}"
@@ -304,7 +304,7 @@ function show_menu() {
     echo -e "${YELLOW}║   ${RED}5)${NC} ${BOLD_WHITE}List Accounts                                 ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}6)${NC} ${BOLD_WHITE}Backup / Restore                              ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Exit                                          ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║                                                      ║${NC}"
+    echo -e "${YELLOW}║                                                    ║${NC}"
     echo -e "${YELLOW}╚════════════════════════════════════════════════════╝${NC}"
     
     read -p "Enter your choice [0-6]: " choice
