@@ -9,14 +9,50 @@ BOLD_WHITE='\033[1;37m'
 NC='\033[0m' # No Color
 
 # Box drawing characters
-TL='╔' # Top Left
-TR='╗' # Top Right
-BL='╚' # Bottom Left
-BR='╝' # Bottom Right
-H='═'  # Horizontal
-V='║'  # Vertical
-ML='╠' # Middle Left
-MR='╣' # Middle Right
+TL='╔'
+TR='╗'
+BL='╚'
+BR='╝'
+H='═'
+V='║'
+
+# --- UI Helper Functions ---
+# This function draws a perfectly aligned menu box.
+function draw_menu() {
+    local title="$1"
+    shift
+    local items=("$@")
+    local width=52
+
+    # Draw Header
+    local title_len=${#title}
+    # Calculate padding to center the title
+    local padding=$(( (width - title_len - 6) / 2 ))
+    # Handle odd/even padding for perfect centering
+    local remainder=$(( (width - title_len - 6) % 2 ))
+    local right_padding=$((padding + remainder))
+    
+    printf "${YELLOW}${TL}"
+    for ((i=0; i<padding; i++)); do printf "$H"; done
+    printf "// ${RED}%s${YELLOW} \\\\" "$title"
+    for ((i=0; i<right_padding; i++)); do printf "$H"; done
+    printf "${TR}${NC}\n"
+
+    # Draw Menu Items
+    printf "${YELLOW}${V}${NC} %-${width}s ${YELLOW}${V}${NC}\n" ""
+    for item in "${items[@]}"; do
+        # Split item into number and text
+        num=$(echo "$item" | cut -d' ' -f1)
+        text=$(echo "$item" | cut -d' ' -f2-)
+        printf "${YELLOW}${V}${NC}   ${RED}%s)${NC} ${BOLD_WHITE}%-$(($width-6))s${NC} ${YELLOW}${V}${NC}\n" "$num" "$text"
+    done
+    printf "${YELLOW}${V}${NC} %-${width}s ${YELLOW}${V}${NC}\n" ""
+
+    # Draw Footer
+    printf "${YELLOW}${BL}"
+    for ((i=0; i<width; i++)); do printf "$H"; done
+    printf "${BR}${NC}\n"
+}
 
 # --- Pre-flight Checks ---
 if [ "$(id -u)" -ne 0 ]; then
@@ -121,32 +157,6 @@ function create_trial_account() {
     echo "♨ᵗᵉʳⁱᵐᵃᵏᵃˢⁱʰ ᵗᵉˡᵃʰ ᵐᵉⁿᵍᵍᵘⁿᵃᵏᵃⁿ ˡᵃʸᵃⁿᵃⁿ ᵏᵃᵐⁱ♨"
     
     restart_zivpn
-}
-
-function create_account() {
-    clear
-    
-    # Header - Total inner width 50 chars
-    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}// ${RED}Create Account${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
-    
-    # Menu Items
-    printf "${YELLOW}${V}${NC} %-50s ${YELLOW}${V}${NC}\n" ""
-    printf "${YELLOW}${V}${NC}   ${RED}1)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Create Zivpn (Manual)"
-    printf "${YELLOW}${V}${NC}   ${RED}2)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Trial Zivpn (Auto)"
-    printf "${YELLOW}${V}${NC}   ${RED}0)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Back to Main Menu"
-    printf "${YELLOW}${V}${NC} %-50s ${YELLOW}${V}${NC}\n" ""
-
-    # Footer
-    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
-
-    read -p "Enter your choice [0-2]: " choice
-
-    case $choice in
-        1) create_manual_account ;;
-        2) create_trial_account ;;
-        0) return ;;
-        *) echo "Invalid option." ;;
-    esac
 }
 
 function renew_account() {
@@ -285,22 +295,27 @@ function setup_auto_backup() {
     fi
 }
 
+function create_account() {
+    clear
+    local title="Create Account"
+    local items=("1 Create Zivpn (Manual)" "2 Trial Zivpn (Auto)" "0 Back to Main Menu")
+    draw_menu "$title" "${items[@]}"
+    
+    read -p "Enter your choice [0-2]: " choice
+
+    case $choice in
+        1) create_manual_account ;;
+        2) create_trial_account ;;
+        0) return ;;
+        *) echo "Invalid option." ;;
+    esac
+}
+
 function show_backup_menu() {
     clear
-
-    # Header - Total inner width 50 chars
-    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}// ${RED}Backup / Restore Menu${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
-
-    # Menu Items
-    printf "${YELLOW}${V}${NC} %-50s ${YELLOW}${V}${NC}\n" ""
-    printf "${YELLOW}${V}${NC}   ${RED}1)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Backup Data"
-    printf "${YELLOW}${V}${NC}   ${RED}2)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Restore Data"
-    printf "${YELLOW}${V}${NC}   ${RED}3)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Auto Backup"
-    printf "${YELLOW}${V}${NC}   ${RED}0)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Back to Main Menu"
-    printf "${YELLOW}${V}${NC} %-50s ${YELLOW}${V}${NC}\n" ""
-
-    # Footer
-    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
+    local title="Backup / Restore Menu"
+    local items=("1 Backup Data" "2 Restore Data" "3 Auto Backup" "0 Back to Main Menu")
+    draw_menu "$title" "${items[@]}"
     
     read -p "Enter your choice [0-3]: " choice
     
@@ -315,26 +330,11 @@ function show_backup_menu() {
 
 function show_menu() {
     clear
-    
-    # Figlet Header
     figlet "ZIVPN" | lolcat
     
-    # Header
-    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}// ${RED}KEDAI SSH${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
-    
-    # Menu Items
-    printf "${YELLOW}${V}${NC} %-49s ${YELLOW}${V}${NC}\n" ""
-    printf "${YELLOW}${V}${NC}   ${RED}1)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Create Account"
-    printf "${YELLOW}${V}${NC}   ${RED}2)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Renew Account"
-    printf "${YELLOW}${V}${NC}   ${RED}3)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Delete Account"
-    printf "${YELLOW}${V}${NC}   ${RED}4)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Change Domain"
-    printf "${YELLOW}${V}${NC}   ${RED}5)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "List Accounts"
-    printf "${YELLOW}${V}${NC}   ${RED}6)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Backup / Restore"
-    printf "${YELLOW}${V}${NC}   ${RED}0)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Exit"
-    printf "${YELLOW}${V}${NC} %-49s ${YELLOW}${V}${NC}\n" ""
-
-    # Footer
-    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
+    local title="KEDAI SSH"
+    local items=("1 Create Account" "2 Renew Account" "3 Delete Account" "4 Change Domain" "5 List Accounts" "6 Backup / Restore" "0 Exit")
+    draw_menu "$title" "${items[@]}"
     
     read -p "Enter your choice [0-6]: " choice
 
@@ -391,7 +391,7 @@ function run_setup() {
     echo "${RANDOM_PASS}:${EXPIRY_DATE}" >> /etc/zivpn/users.db
     jq --arg pass "$RANDOM_PASS" '.auth.config += [$pass]' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
 
-    echo "Setting up daily expiry check cron job..."
+    echo "Setting up expiry check cron job..."
     cat <<'EOF' > /etc/zivpn/expire_check.sh
 #!/bin/bash
 DB_FILE="/etc/zivpn/users.db"
@@ -424,7 +424,7 @@ fi
 exit 0
 EOF
     chmod +x /etc/zivpn/expire_check.sh
-    CRON_JOB_EXPIRY="* * * * * /etc/zivpn/expire_check.sh # zivpn-expiry-check"
+    CRON_JOB_EXPIRY="0 0 * * * /etc/zivpn/expire_check.sh # zivpn-expiry-check"
     (crontab -l 2>/dev/null | grep -v "# zivpn-expiry-check") | crontab -
     (crontab -l 2>/dev/null; echo "$CRON_JOB_EXPIRY") | crontab -
 
