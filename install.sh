@@ -314,7 +314,7 @@ function _draw_service_status() {
     local padding_right=$((padding_total - padding_left))
 
     echo -e "${YELLOW}╔════════════════════════════════════════════════════╗${NC}"
-                       (printf '%*s' $padding_left)${status_output}$(printf '%*s' $padding_right)
+    echo -e            $(printf '%*s' $padding_left)${status_output}$(printf '%*s' $padding_right)
     echo -e "${YELLOW}╔════════════════════════════════════════════════════╗${NC}"
 
 }
