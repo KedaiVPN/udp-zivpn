@@ -1,62 +1,71 @@
 #!/bin/bash
-# Zivpn UDP Module installer
-# Creator Zahid Islam
 
-echo -e "Updating server"
-sudo apt-get update && apt-get upgrade -y
-systemctl stop zivpn.service 1> /dev/null 2> /dev/null
-echo -e "Downloading UDP Service"
-wget https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-amd64 -O /usr/local/bin/zivpn 1> /dev/null 2> /dev/null
+# Pre-flight check
+if [ "$(id -u)" -ne 0 ]; then
+  echo "This script must be run as root" >&2
+  exit 1
+fi
+
+echo "Installing required packages..."
+apt-get update
+apt-get install -y unzip
+
+echo "Creating configuration directory..."
+mkdir -p /etc/zivpn
+
+echo "Downloading and installing zivpn server..."
+wget -O /tmp/zivpn.zip https://github.com/kedaivpn/udp-zivpn/raw/main/zivpn.zip
+unzip -o /tmp/zivpn.zip -d /usr/local/bin/
+rm /tmp/zivpn.zip
 chmod +x /usr/local/bin/zivpn
-mkdir /etc/zivpn 1> /dev/null 2> /dev/null
-wget https://raw.githubusercontent.com/zahidbd2/udp-zivpn/main/config.json -O /etc/zivpn/config.json 1> /dev/null 2> /dev/null
 
-echo "Generating cert files:"
-openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 -subj "/C=US/ST=California/L=Los Angeles/O=Example Corp/OU=IT Department/CN=zivpn" -keyout "/etc/zivpn/zivpn.key" -out "/etc/zivpn/zivpn.crt"
-sysctl -w net.core.rmem_max=16777216 1> /dev/null 2> /dev/null
-sysctl -w net.core.wmem_max=16777216 1> /dev/null 2> /dev/null
+echo "Creating config.json..."
+cat <<EOF > /etc/zivpn/config.json
+{
+  "auth": {
+    "mode": "password",
+    "config": [
+      "default_pass"
+    ]
+  },
+  "udp": {
+    "listen": ":5667"
+  },
+  "ssl": {
+    "cert": "/etc/zivpn/zivpn.crt",
+    "key": "/etc/zivpn/zivpn.key"
+  }
+}
+EOF
+
+echo "Generating SSL certificate..."
+openssl req -new -newkey rsa:4096 -days 3650 -nodes -x509 \
+    -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=zivpn" \
+    -keyout "/etc/zivpn/zivpn.key" -out "/etc/zivpn/zivpn.crt"
+
+echo "Creating systemd service..."
 cat <<EOF > /etc/systemd/system/zivpn.service
 [Unit]
-Description=zivpn VPN Server
+Description=ZIVPN Service
 After=network.target
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/etc/zivpn
-ExecStart=/usr/local/bin/zivpn server -c /etc/zivpn/config.json
+ExecStart=/usr/local/bin/zivpn -config /etc/zivpn/config.json
 Restart=always
 RestartSec=3
-Environment=ZIVPN_LOG_LEVEL=info
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
-AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
-NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-echo -e "ZIVPN UDP Passwords"
-read -p "Enter passwords separated by commas, example: pass1,pass2 (Press enter for Default 'zi'): " input_config
+echo "Setting up firewall rules..."
+iptables -t nat -A PREROUTING -i $(ip -4 route ls|grep default|grep -Po '(?<=dev )(\S+)'|head -1) -p udp --dport 6000:19999 -j DNAT --to-destination :5667
 
-if [ -n "$input_config" ]; then
-    IFS=',' read -r -a config <<< "$input_config"
-    if [ ${#config[@]} -eq 1 ]; then
-        config+=(${config[0]})
-    fi
-else
-    config=("zi")
-fi
-
-new_config_str="\"config\": [$(printf "\"%s\"," "${config[@]}" | sed 's/,$//')]"
-
-sed -i -E "s/\"config\": ?\[[[:space:]]*\"zi\"[[:space:]]*\]/${new_config_str}/g" /etc/zivpn/config.json
-
-
+echo "Starting ZIVPN service..."
+systemctl daemon-reload
 systemctl enable zivpn.service
 systemctl start zivpn.service
-iptables -t nat -A PREROUTING -i $(ip -4 route ls|grep default|grep -Po '(?<=dev )(\S+)'|head -1) -p udp --dport 6000:19999 -j DNAT --to-destination :5667
-ufw allow 6000:19999/udp
-ufw allow 5667/udp
-rm zi.* 1> /dev/null 2> /dev/null
-echo -e "ZIVPN UDP Installed"
+
+echo "Installation complete."
