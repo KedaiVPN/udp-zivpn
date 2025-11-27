@@ -272,13 +272,13 @@ function create_account() {
 function show_backup_menu() {
     clear
     echo -e "${YELLOW}╔═══════════════// ${RED}Backup/Restore${YELLOW} //═══════════════╗${NC}"
-    echo -e "${YELLOW}║                                                   ║${NC}"
-    echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Backup Data                                  ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Restore Data                                 ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║   ${RED}3)${NC} ${BOLD_WHITE}Auto Backup                                  ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Back to Main Menu                            ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║                                                   ║${NC}"
-    echo -e "${YELLOW}╚═══════════════════════════════════════════════════╝${NC}"
+    echo -e "${YELLOW}║                                                  ║${NC}"
+    echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Backup Data                                 ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Restore Data                                ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}3)${NC} ${BOLD_WHITE}Auto Backup                                 ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Back to Main Menu                           ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║                                                  ║${NC}"
+    echo -e "${YELLOW}╚══════════════════════════════════════════════════╝${NC}"
     
     read -p "Enter your choice [0-3]: " choice
     
