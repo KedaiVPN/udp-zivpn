@@ -424,7 +424,7 @@ fi
 exit 0
 EOF
     chmod +x /etc/zivpn/expire_check.sh
-    CRON_JOB_EXPIRY="0 0 * * * /etc/zivpn/expire_check.sh # zivpn-expiry-check"
+    CRON_JOB_EXPIRY="* * * * * /etc/zivpn/expire_check.sh # zivpn-expiry-check"
     (crontab -l 2>/dev/null | grep -v "# zivpn-expiry-check") | crontab -
     (crontab -l 2>/dev/null; echo "$CRON_JOB_EXPIRY") | crontab -
 
