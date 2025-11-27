@@ -251,10 +251,10 @@ function setup_auto_backup() {
 
 function create_account() {
     clear
-    echo -e "${YELLOW}╔════════════════// ${RED}Create Account${YELLOW} //═════════════════╗${NC}"
+    echo -e "${YELLOW}╔════════════════// ${RED}Create Account${YELLOW} //════════════════╗${NC}"
     echo -e "${YELLOW}║                                                    ║${NC}"
-    echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Create Zivpn (Manual)                         ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Trial Zivpn (Auto)                            ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Create Zivpn                                  ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Trial Zivpn                                   ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Back to Main Menu                             ${YELLOW}║${NC}"
     echo -e "${YELLOW}║                                                    ║${NC}"
     echo -e "${YELLOW}╚════════════════════════════════════════════════════╝${NC}"
