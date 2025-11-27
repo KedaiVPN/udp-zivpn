@@ -2,18 +2,21 @@
 # Zivpn UDP Module Manager
 # This script installs the base Zivpn service and then sets up an advanced management interface.
 
-# --- Color Definitions ---
+# --- UI Definitions ---
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 CYAN='\033[1;36m'
 NC='\033[0m' # No Color
 
-# --- UI Functions ---
-function print_header() {
-    echo -e "${YELLOW}--------// ${RED}ZIVPN${YELLOW} \\\\--------${NC}"
-    echo -e "             ${CYAN}©KEDAI SSH${NC}"
-    echo ""
-}
+# Box drawing characters
+TL='╔' # Top Left
+TR='╗' # Top Right
+BL='╚' # Bottom Left
+BR='╝' # Bottom Right
+H='═'  # Horizontal
+V='║'  # Vertical
+ML='╠' # Middle Left
+MR='╣' # Middle Right
 
 # --- Pre-flight Checks ---
 if [ "$(id -u)" -ne 0 ]; then
@@ -122,12 +125,20 @@ function create_trial_account() {
 
 function create_account() {
     clear
-    print_header
-    echo -e "${YELLOW}------------------------------------${NC}"
-    echo -e "${RED} 1)${NC} ${CYAN}Create Zivpn (Manual)${NC}"
-    echo -e "${RED} 2)${NC} ${CYAN}Trial Zivpn (Auto)${NC}"
-    echo -e "${RED} 0)${NC} ${CYAN}Back to Main Menu${NC}"
-    echo -e "${YELLOW}------------------------------------${NC}"
+    
+    # Header
+    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}// ${RED}Create Account${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
+    
+    # Menu Items
+    printf "${YELLOW}${V}${NC} %-40s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC}   ${RED}1)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Create Zivpn (Manual)"
+    printf "${YELLOW}${V}${NC}   ${RED}2)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Trial Zivpn (Auto)"
+    printf "${YELLOW}${V}${NC}   ${RED}0)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Back to Main Menu"
+    printf "${YELLOW}${V}${NC} %-40s ${YELLOW}${V}${NC}\n" ""
+
+    # Footer
+    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
+
     read -p "Enter your choice [0-2]: " choice
 
     case $choice in
@@ -276,13 +287,21 @@ function setup_auto_backup() {
 
 function show_backup_menu() {
     clear
-    print_header
-    echo -e "${YELLOW}------------------------------------${NC}"
-    echo -e "${RED} 1)${NC} ${CYAN}Backup Data${NC}"
-    echo -e "${RED} 2)${NC} ${CYAN}Restore Data${NC}"
-    echo -e "${RED} 3)${NC} ${CYAN}Auto Backup${NC}"
-    echo -e "${RED} 0)${NC} ${CYAN}Back to Main Menu${NC}"
-    echo -e "${YELLOW}------------------------------------${NC}"
+
+    # Header
+    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}// ${RED}Backup / Restore Menu${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
+
+    # Menu Items
+    printf "${YELLOW}${V}${NC} %-40s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC}   ${RED}1)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Backup Data"
+    printf "${YELLOW}${V}${NC}   ${RED}2)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Restore Data"
+    printf "${YELLOW}${V}${NC}   ${RED}3)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Auto Backup"
+    printf "${YELLOW}${V}${NC}   ${RED}0)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Back to Main Menu"
+    printf "${YELLOW}${V}${NC} %-40s ${YELLOW}${V}${NC}\n" ""
+
+    # Footer
+    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
+    
     read -p "Enter your choice [0-3]: " choice
     
     case $choice in
@@ -296,16 +315,26 @@ function show_backup_menu() {
 
 function show_menu() {
     clear
-    print_header
-    echo -e "${YELLOW}------------------------------------${NC}"
-    echo -e "${RED} 1)${NC} ${CYAN}Create Account${NC}"
-    echo -e "${RED} 2)${NC} ${CYAN}Renew Account${NC}"
-    echo -e "${RED} 3)${NC} ${CYAN}Delete Account${NC}"
-    echo -e "${RED} 4)${NC} ${CYAN}Change Domain${NC}"
-    echo -e "${RED} 5)${NC} ${CYAN}List Accounts${NC}"
-    echo -e "${RED} 6)${NC} ${CYAN}Backup / Restore${NC}"
-    echo -e "${RED} 0)${NC} ${CYAN}Exit${NC}"
-    echo -e "${YELLOW}------------------------------------${NC}"
+    local menu_width=42
+    
+    # Header
+    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}// ${RED}ZIVPN${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
+    
+    # Menu Items
+    printf "${YELLOW}${V}${NC} %-40s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC}   ${RED}1)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Create Account"
+    printf "${YELLOW}${V}${NC}   ${RED}2)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Renew Account"
+    printf "${YELLOW}${V}${NC}   ${RED}3)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Delete Account"
+    printf "${YELLOW}${V}${NC}   ${RED}4)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Change Domain"
+    printf "${YELLOW}${V}${NC}   ${RED}5)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "List Accounts"
+    printf "${YELLOW}${V}${NC}   ${RED}6)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Backup / Restore"
+    printf "${YELLOW}${V}${NC}   ${RED}0)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Exit"
+    printf "${YELLOW}${V}${NC} %-40s ${YELLOW}${V}${NC}\n" ""
+
+    # Footer
+    echo -e "${YELLOW}${ML}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}©KEDAI SSH${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${MR}${NC}"
+    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
+    
     read -p "Enter your choice [0-6]: " choice
 
     case $choice in
