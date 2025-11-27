@@ -2,6 +2,19 @@
 # Zivpn UDP Module Manager
 # This script installs the base Zivpn service and then sets up an advanced management interface.
 
+# --- Color Definitions ---
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+CYAN='\033[1;36m'
+NC='\033[0m' # No Color
+
+# --- UI Functions ---
+function print_header() {
+    echo -e "${YELLOW}--------// ${RED}ZIVPN${YELLOW} \\\\--------${NC}"
+    echo -e "             ${CYAN}©KEDAI SSH${NC}"
+    echo ""
+}
+
 # --- Pre-flight Checks ---
 if [ "$(id -u)" -ne 0 ]; then
   echo "This script must be run as root. Please use sudo or run as root user." >&2
@@ -109,12 +122,12 @@ function create_trial_account() {
 
 function create_account() {
     clear
-    echo "Create Account Menu"
-    echo "-------------------"
-    echo "1. Create Zivpn (Manual Password & Day-based Expiry)"
-    echo "2. Trial Zivpn (Auto Password & Minute-based Expiry)"
-    echo "0. Back to Main Menu"
-    echo "-------------------"
+    print_header
+    echo -e "${YELLOW}------------------------------------${NC}"
+    echo -e "${RED} 1)${NC} ${CYAN}Create Zivpn (Manual)${NC}"
+    echo -e "${RED} 2)${NC} ${CYAN}Trial Zivpn (Auto)${NC}"
+    echo -e "${RED} 0)${NC} ${CYAN}Back to Main Menu${NC}"
+    echo -e "${YELLOW}------------------------------------${NC}"
     read -p "Enter your choice [0-2]: " choice
 
     case $choice in
@@ -263,13 +276,13 @@ function setup_auto_backup() {
 
 function show_backup_menu() {
     clear
-    echo "Backup / Restore Menu"
-    echo "---------------------"
-    echo "1. Backup Data"
-    echo "2. Restore Data"
-    echo "3. Auto Backup"
-    echo "0. Back to Main Menu"
-    echo "---------------------"
+    print_header
+    echo -e "${YELLOW}------------------------------------${NC}"
+    echo -e "${RED} 1)${NC} ${CYAN}Backup Data${NC}"
+    echo -e "${RED} 2)${NC} ${CYAN}Restore Data${NC}"
+    echo -e "${RED} 3)${NC} ${CYAN}Auto Backup${NC}"
+    echo -e "${RED} 0)${NC} ${CYAN}Back to Main Menu${NC}"
+    echo -e "${YELLOW}------------------------------------${NC}"
     read -p "Enter your choice [0-3]: " choice
     
     case $choice in
@@ -283,16 +296,16 @@ function show_backup_menu() {
 
 function show_menu() {
     clear
-    echo "ZIVPN Account Manager"
-    echo "---------------------"
-    echo "1. Create Account"
-    echo "2. Renew Account"
-    echo "3. Delete Account"
-    echo "4. Change Domain"
-    echo "5. List Accounts"
-    echo "6. Backup / Restore"
-    echo "0. Exit"
-    echo "---------------------"
+    print_header
+    echo -e "${YELLOW}------------------------------------${NC}"
+    echo -e "${RED} 1)${NC} ${CYAN}Create Account${NC}"
+    echo -e "${RED} 2)${NC} ${CYAN}Renew Account${NC}"
+    echo -e "${RED} 3)${NC} ${CYAN}Delete Account${NC}"
+    echo -e "${RED} 4)${NC} ${CYAN}Change Domain${NC}"
+    echo -e "${RED} 5)${NC} ${CYAN}List Accounts${NC}"
+    echo -e "${RED} 6)${NC} ${CYAN}Backup / Restore${NC}"
+    echo -e "${RED} 0)${NC} ${CYAN}Exit${NC}"
+    echo -e "${YELLOW}------------------------------------${NC}"
     read -p "Enter your choice [0-6]: " choice
 
     case $choice in
