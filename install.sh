@@ -240,6 +240,23 @@ function list_accounts() {
     read -p "Press Enter to return to the menu..."
 }
 
+function format_kib_to_human() {
+    local kib=$1
+    if ! [[ "$kib" =~ ^[0-9]+$ ]] || [ -z "$kib" ] || [ "$kib" -le 0 ]; then
+        echo "0 B"
+        return
+    fi
+    
+    # Using awk for floating point math to avoid installing 'bc'
+    if [ "$kib" -lt 1024 ]; then
+        echo "${kib} KiB"
+    elif [ "$kib" -lt 1048576 ]; then
+        awk -v val="$kib" 'BEGIN { printf "%.2f MiB", val / 1024 }'
+    else
+        awk -v val="$kib" 'BEGIN { printf "%.2f GiB", val / 1048576 }'
+    fi
+}
+
 function _draw_info_panel() {
     # --- Fetch Data ---
     local os_info isp_info ip_info host_info bw_today bw_month
@@ -264,10 +281,36 @@ function _draw_info_panel() {
     host_info=${host_info:-"N/A"}
 
     if command -v vnstat &> /dev/null && vnstat --version &> /dev/null; then
-        bw_today=$(vnstat -d | grep "today" | awk '{print $8 $9}' | sed 's/iB//g' || echo "N/A")
-        bw_month=$(vnstat -m | grep "$(date +'%b ''%y')" | awk '{print $6 $7}' | sed 's/iB//g' || echo "N/A")
-        bw_today=${bw_today:-"N/A"}
-        bw_month=${bw_month:-"N/A"}
+        local daily_json monthly_json
+        daily_json=$(vnstat --json d 1)
+        monthly_json=$(vnstat --json m 1)
+
+        # Daily
+        local today_rx_kib=0 today_tx_kib=0
+        local vnstat_day
+        vnstat_day=$(echo "$daily_json" | jq '.interfaces[0].traffic.days[0].date.day // 0')
+        local current_day
+        current_day=$(date +%d | sed 's/^0*//')
+        if [[ "$vnstat_day" -eq "$current_day" ]]; then
+            today_rx_kib=$(echo "$daily_json" | jq '.interfaces[0].traffic.days[0].rx // 0')
+            today_tx_kib=$(echo "$daily_json" | jq '.interfaces[0].traffic.days[0].tx // 0')
+        fi
+        local today_total_kib=$((today_rx_kib + today_tx_kib))
+        bw_today=$(format_kib_to_human "$today_total_kib")
+
+        # Monthly
+        local month_rx_kib=0 month_tx_kib=0
+        local vnstat_month
+        vnstat_month=$(echo "$monthly_json" | jq '.interfaces[0].traffic.months[0].date.month // 0')
+        local current_month
+        current_month=$(date +%m | sed 's/^0*//')
+        if [[ "$vnstat_month" -eq "$current_month" ]]; then
+            month_rx_kib=$(echo "$monthly_json" | jq '.interfaces[0].traffic.months[0].rx // 0')
+            month_tx_kib=$(echo "$monthly_json" | jq '.interfaces[0].traffic.months[0].tx // 0')
+        fi
+        local month_total_kib=$((month_rx_kib + month_tx_kib))
+        bw_month=$(format_kib_to_human "$month_total_kib")
+
     else
         bw_today="N/A"
         bw_month="N/A"
@@ -385,7 +428,7 @@ function show_menu() {
     clear
     figlet "UDP ZIVPN" | lolcat
     
-    echo -e "${YELLOW}╔══════════════════// ${CYAN}KEDAI SSH${YELLOW} //═══════════════════╗${NC}"
+    echo -e "${YELLOW}╔══════════════════// ${RED}KEDAI SSH${YELLOW} //═══════════════════╗${NC}"
     _draw_info_panel
     _draw_service_status
     echo -e "${YELLOW}║                                                    ║${NC}"
