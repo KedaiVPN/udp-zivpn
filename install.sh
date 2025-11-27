@@ -39,18 +39,18 @@ function draw_menu() {
     printf "${TR}${NC}\n"
 
     # Draw Menu Items
-    printf "${YELLOW}${V}${NC} %-${width}s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC} %-52s ${YELLOW}${V}${NC}\n" ""
     for item in "${items[@]}"; do
         # Split item into number and text
         num=$(echo "$item" | cut -d' ' -f1)
         text=$(echo "$item" | cut -d' ' -f2-)
-        printf "${YELLOW}${V}${NC}   ${RED}%s)${NC} ${BOLD_WHITE}%-$(($width-6))s${NC} ${YELLOW}${V}${NC}\n" "$num" "$text"
+        printf "${YELLOW}${V}${NC}   ${RED}%s)${NC} ${BOLD_WHITE}%-46s${NC} ${YELLOW}${V}${NC}\n" "$num" "$text"
     done
-    printf "${YELLOW}${V}${NC} %-${width}s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC} %-52s ${YELLOW}${V}${NC}\n" ""
 
     # Draw Footer
     printf "${YELLOW}${BL}"
-    for ((i=0; i<width; i++)); do printf "$H"; done
+    for ((i=0; i<width+2; i++)); do printf "$H"; done
     printf "${BR}${NC}\n"
 }
 
