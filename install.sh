@@ -114,7 +114,10 @@ function create_trial_account() {
 }
 
 function renew_account() {
+    clear
     echo "--- Renew Account ---"
+    _display_accounts
+    echo "" # Add a newline for better spacing
     read -p "Enter password to renew: " password
     if [ -z "$password" ]; then
         echo "Password cannot be empty."
@@ -155,7 +158,10 @@ function renew_account() {
 }
 
 function delete_account() {
+    clear
     echo "--- Delete Account ---"
+    _display_accounts
+    echo "" # Add a newline for better spacing
     read -p "Enter password to delete: " password
     if [ -z "$password" ]; then
         echo "Password cannot be empty."
@@ -198,8 +204,7 @@ function change_domain() {
     restart_zivpn
 }
 
-function list_accounts() {
-    echo "--- Active Accounts ---"
+function _display_accounts() {
     local db_file="/etc/zivpn/users.db"
 
     if [ ! -f "$db_file" ] || [ ! -s "$db_file" ]; then
@@ -223,6 +228,14 @@ function list_accounts() {
         fi
     done < "$db_file"
     echo "------------------------------------------"
+}
+
+function list_accounts() {
+    clear
+    echo "--- Active Accounts ---"
+    _display_accounts
+    echo "" # Add a newline for better spacing
+    read -p "Press Enter to return to the menu..."
 }
 
 function setup_auto_backup() {
@@ -433,7 +446,6 @@ function main() {
 
     while true; do
         show_menu
-        read -p "Press Enter to return to the menu..."
     done
 }
 
