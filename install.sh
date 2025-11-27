@@ -271,7 +271,7 @@ function create_account() {
 
 function show_backup_menu() {
     clear
-    echo -e "${YELLOW}╔═══════════════// ${RED}Backup/Restore${YELLOW} //════════════════╗${NC}"
+    echo -e "${YELLOW}╔═══════════════// ${RED}Backup/Restore${YELLOW} //═══════════════╗${NC}"
     echo -e "${YELLOW}║                                                  ║${NC}"
     echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Backup Data                                 ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Restore Data                                ${YELLOW}║${NC}"
@@ -293,7 +293,7 @@ function show_backup_menu() {
 
 function show_menu() {
     clear
-    figlet "UDP - ZIVPN" | lolcat
+    figlet "UDP ZIVPN" | lolcat
     
     echo -e "${YELLOW}╔══════════════════// ${RED}KEDAI SSH${YELLOW} //═══════════════════╗${NC}"
     echo -e "${YELLOW}║                                                    ║${NC}"
