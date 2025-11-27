@@ -17,41 +17,72 @@ H='═'
 V='║'
 
 # --- UI Helper Functions ---
-# This function draws a perfectly aligned menu box.
+# Draw a neatly aligned menu box; safe with colored output.
 function draw_menu() {
     local title="$1"
     shift
     local items=("$@")
-    local width=52
 
-    # Draw Header
-    local title_len=${#title}
-    # Calculate padding to center the title
-    local padding=$(( (width - title_len - 6) / 2 ))
-    # Handle odd/even padding for perfect centering
-    local remainder=$(( (width - title_len - 6) % 2 ))
-    local right_padding=$((padding + remainder))
-    
-    printf "${YELLOW}${TL}"
-    for ((i=0; i<padding; i++)); do printf "$H"; done
-    printf "// ${RED}%s${YELLOW} \\\\" "$title"
-    for ((i=0; i<right_padding; i++)); do printf "$H"; done
-    printf "${TR}${NC}\n"
+    # Remove ANSI sequences for length calculations (if any)
+    local clean_title
+    clean_title=$(echo -ne "$title" | sed -r 's/\x1B\[[0-9;]*[mK]//g')
+    local title_len=${#clean_title}
 
-    # Draw Menu Items
-    printf "${YELLOW}${V}${NC} %-${width}s ${YELLOW}${V}${NC}\n" ""
+    # Determine longest item visible length (we'll display "N) text")
+    local max_item_len=0
     for item in "${items[@]}"; do
-        # Split item into number and text
-        num=$(echo "$item" | cut -d' ' -f1)
-        text=$(echo "$item" | cut -d' ' -f2-)
-        printf "${YELLOW}${V}${NC}   ${RED}%s)${NC} ${BOLD_WHITE}%-$(($width-6))s${NC} ${YELLOW}${V}${NC}\n" "$num" "$text"
+        # build visible representation like "1) Text here"
+        local num=$(echo "$item" | awk '{print $1}')
+        local text=$(echo "$item" | cut -d' ' -f2-)
+        local visible="  ${num}) ${text}"
+        local visible_len=${#visible}
+        if (( visible_len > max_item_len )); then
+            max_item_len=$visible_len
+        fi
     done
-    printf "${YELLOW}${V}${NC} %-${width}s ${YELLOW}${V}${NC}\n" ""
 
-    # Draw Footer
-    printf "${YELLOW}${BL}"
-    for ((i=0; i<width; i++)); do printf "$H"; done
-    printf "${BR}${NC}\n"
+    # compute width: allow some padding, minimum 50 chars inner width
+    local inner_width=$(( max_item_len + 6 ))
+    (( inner_width < 50 )) && inner_width=50
+
+    # Top border
+    printf "${YELLOW}%s" "${TL}"
+    for ((i=0;i<inner_width;i++)); do printf "%s" "$H"; done
+    printf "%s${NC}\n" "${TR}"
+
+    # Title line (centered)
+    local pad_left=$(( (inner_width - title_len) / 2 ))
+    (( pad_left < 0 )) && pad_left=0
+    local pad_right=$(( inner_width - title_len - pad_left ))
+    printf "${YELLOW}${V}${NC}"
+    printf "%*s" $pad_left ""
+    printf "${BOLD_WHITE}%s${NC}" "$title"
+    printf "%*s" $pad_right ""
+    printf "${YELLOW}${V}${NC}\n"
+
+    # Empty separator line
+    printf "${YELLOW}${V}${NC}"
+    printf "%-${inner_width}s" ""
+    printf "${YELLOW}${V}${NC}\n"
+
+    # Items
+    for item in "${items[@]}"; do
+        local num=$(echo "$item" | awk '{print $1}')
+        local text=$(echo "$item" | cut -d' ' -f2-)
+        local line="  ${RED}${num})${NC} ${BOLD_WHITE}${text}${NC}"
+        # Print item padded to inner_width
+        printf "${YELLOW}${V}${NC} %-*s ${YELLOW}${V}${NC}\n" "$inner_width" "$line"
+    done
+
+    # Empty separator line
+    printf "${YELLOW}${V}${NC}"
+    printf "%-${inner_width}s" ""
+    printf "${YELLOW}${V}${NC}\n"
+
+    # Bottom border
+    printf "${YELLOW}%s" "${BL}"
+    for ((i=0;i<inner_width;i++)); do printf "%s" "$H"; done
+    printf "%s${NC}\n" "${BR}"
 }
 
 # --- Pre-flight Checks ---
@@ -313,7 +344,7 @@ function create_account() {
 
 function show_backup_menu() {
     clear
-    local title="Backup / Restore Menu"
+    local title="Backup / Restore"
     local items=("1 Backup Data" "2 Restore Data" "3 Auto Backup" "0 Back to Main Menu")
     draw_menu "$title" "${items[@]}"
     
