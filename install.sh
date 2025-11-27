@@ -126,18 +126,18 @@ function create_trial_account() {
 function create_account() {
     clear
     
-    # Header
-    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}// ${RED}Create Account${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
+    # Header - Total inner width 50 chars
+    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}// ${RED}Create Account${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
     
     # Menu Items
-    printf "${YELLOW}${V}${NC} %-49s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC} %-50s ${YELLOW}${V}${NC}\n" ""
     printf "${YELLOW}${V}${NC}   ${RED}1)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Create Zivpn (Manual)"
     printf "${YELLOW}${V}${NC}   ${RED}2)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Trial Zivpn (Auto)"
     printf "${YELLOW}${V}${NC}   ${RED}0)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Back to Main Menu"
-    printf "${YELLOW}${V}${NC} %-49s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC} %-50s ${YELLOW}${V}${NC}\n" ""
 
     # Footer
-    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
+    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
 
     read -p "Enter your choice [0-2]: " choice
 
@@ -288,19 +288,19 @@ function setup_auto_backup() {
 function show_backup_menu() {
     clear
 
-    # Header
-    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}${H}// ${RED}Backup / Restore Menu${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
+    # Header - Total inner width 50 chars
+    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}// ${RED}Backup / Restore Menu${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
 
     # Menu Items
-    printf "${YELLOW}${V}${NC} %-49s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC} %-50s ${YELLOW}${V}${NC}\n" ""
     printf "${YELLOW}${V}${NC}   ${RED}1)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Backup Data"
     printf "${YELLOW}${V}${NC}   ${RED}2)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Restore Data"
     printf "${YELLOW}${V}${NC}   ${RED}3)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Auto Backup"
     printf "${YELLOW}${V}${NC}   ${RED}0)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Back to Main Menu"
-    printf "${YELLOW}${V}${NC} %-49s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC} %-50s ${YELLOW}${V}${NC}\n" ""
 
     # Footer
-    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
+    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
     
     read -p "Enter your choice [0-3]: " choice
     
