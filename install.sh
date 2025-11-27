@@ -16,8 +16,8 @@ function restart_zivpn() {
 }
 
 # --- Core Logic Functions ---
-function create_account() {
-    echo "--- Create New Account ---"
+function create_manual_account() {
+    echo "--- Create New Zivpn Account ---"
     read -p "Enter new password: " password
     if [ -z "$password" ]; then
         echo "Password cannot be empty."
@@ -42,7 +42,6 @@ function create_account() {
     
     jq --arg pass "$password" '.auth.config += [$pass]' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
     
-    # --- Display Account Information ---
     local CERT_CN
     CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p')
     local HOST
@@ -65,6 +64,65 @@ function create_account() {
     echo "♨ᵗᵉʳⁱᵐᵃᵏᵃˢⁱʰ ᵗᵉˡᵃʰ ᵐᵉⁿᵍᵍᵘⁿᵃᵏᵃⁿ ˡᵃʸᵃⁿᵃⁿ ᵏᵃᵐⁱ♨"
     
     restart_zivpn
+}
+
+function create_trial_account() {
+    echo "--- Create Trial Zivpn Account ---"
+    read -p "Enter active period (in minutes): " minutes
+    if ! [[ "$minutes" =~ ^[0-9]+$ ]]; then
+        echo "Invalid number of minutes."
+        return
+    fi
+
+    local password="trial$(shuf -i 10000-99999 -n 1)"
+    local db_file="/etc/zivpn/users.db"
+
+    local expiry_date
+    expiry_date=$(date -d "+$minutes minutes" +%s)
+    echo "${password}:${expiry_date}" >> "$db_file"
+    
+    jq --arg pass "$password" '.auth.config += [$pass]' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
+    
+    local CERT_CN
+    CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p')
+    local HOST
+    if [ "$CERT_CN" == "zivpn" ]; then
+        HOST=$(curl -s ifconfig.me)
+    else
+        HOST=$CERT_CN
+    fi
+
+    local EXPIRE_FORMATTED
+    EXPIRE_FORMATTED=$(date -d "@$expiry_date" +"%d %B %Y %H:%M:%S")
+    
+    clear
+    echo "🔹Informasi Akun zivpn Anda🔹"
+    echo "┌─────────────────────"
+    echo "│ Host: $HOST"
+    echo "│ Pass: $password"
+    echo "│ Expire: $EXPIRE_FORMATTED"
+    echo "└─────────────────────"
+    echo "♨ᵗᵉʳⁱᵐᵃᵏᵃˢⁱʰ ᵗᵉˡᵃʰ ᵐᵉⁿᵍᵍᵘⁿᵃᵏᵃⁿ ˡᵃʸᵃⁿᵃⁿ ᵏᵃᵐⁱ♨"
+    
+    restart_zivpn
+}
+
+function create_account() {
+    clear
+    echo "Create Account Menu"
+    echo "-------------------"
+    echo "1. Create Zivpn (Manual Password & Day-based Expiry)"
+    echo "2. Trial Zivpn (Auto Password & Minute-based Expiry)"
+    echo "0. Back to Main Menu"
+    echo "-------------------"
+    read -p "Enter your choice [0-2]: " choice
+
+    case $choice in
+        1) create_manual_account ;;
+        2) create_trial_account ;;
+        0) return ;;
+        *) echo "Invalid option." ;;
+    esac
 }
 
 function renew_account() {
@@ -192,7 +250,6 @@ function setup_auto_backup() {
         return
     fi
 
-    # Remove any existing auto backup cron job to prevent duplicates
     (crontab -l 2>/dev/null | grep -v "# zivpn-auto-backup") | crontab -
 
     if [ "$interval" -gt 0 ]; then
@@ -308,12 +365,9 @@ while IFS=':' read -r password expiry_date; do
 
     if [ "$expiry_date" -le "$CURRENT_DATE" ]; then
         echo "User '${password}' has expired. Deleting permanently."
-        # Remove from config.json
         jq --arg pass "$password" 'del(.auth.config[] | select(. == $pass))' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
         SERVICE_RESTART_NEEDED=true
-        # Do not write to temp db file, effectively deleting from users.db
     else
-        # User is not expired, keep them
         echo "${password}:${expiry_date}" >> "$TMP_DB_FILE"
     fi
 done < "$DB_FILE"
