@@ -8,52 +8,6 @@ RED='\033[0;31m'
 BOLD_WHITE='\033[1;37m'
 NC='\033[0m' # No Color
 
-# Box drawing characters
-TL='╔'
-TR='╗'
-BL='╚'
-BR='╝'
-H='═'
-V='║'
-
-# --- UI Helper Functions ---
-# This function draws a perfectly aligned menu box.
-function draw_menu() {
-    local title="$1"
-    shift
-    local items=("$@")
-    local width=52
-
-    # Draw Header
-    local title_len=${#title}
-    # Calculate padding to center the title
-    local padding=$(( (width - title_len - 6) / 2 ))
-    # Handle odd/even padding for perfect centering
-    local remainder=$(( (width - title_len - 6) % 2 ))
-    local right_padding=$((padding + remainder))
-    
-    printf "${YELLOW}${TL}"
-    for ((i=0; i<padding; i++)); do printf "$H"; done
-    printf "// ${RED}%s${YELLOW} \\\\" "$title"
-    for ((i=0; i<right_padding; i++)); do printf "$H"; done
-    printf "${TR}${NC}\n"
-
-    # Draw Menu Items
-    printf "${YELLOW}${V}${NC} %-52s ${YELLOW}${V}${NC}\n" ""
-    for item in "${items[@]}"; do
-        # Split item into number and text
-        num=$(echo "$item" | cut -d' ' -f1)
-        text=$(echo "$item" | cut -d' ' -f2-)
-        printf "${YELLOW}${V}${NC}   ${RED}%s)${NC} ${BOLD_WHITE}%-46s${NC} ${YELLOW}${V}${NC}\n" "$num" "$text"
-    done
-    printf "${YELLOW}${V}${NC} %-52s ${YELLOW}${V}${NC}\n" ""
-
-    # Draw Footer
-    printf "${YELLOW}${BL}"
-    for ((i=0; i<width+2; i++)); do printf "$H"; done
-    printf "${BR}${NC}\n"
-}
-
 # --- Pre-flight Checks ---
 if [ "$(id -u)" -ne 0 ]; then
   echo "This script must be run as root. Please use sudo or run as root user." >&2
@@ -297,9 +251,13 @@ function setup_auto_backup() {
 
 function create_account() {
     clear
-    local title="Create Account"
-    local items=("1 Create Zivpn (Manual)" "2 Trial Zivpn (Auto)" "0 Back to Main Menu")
-    draw_menu "$title" "${items[@]}"
+    echo -e "${YELLOW}╔══════════════════// ${RED}Create Account${YELLOW} \\\\═══════════════════╗${NC}"
+    echo -e "${YELLOW}║                                                      ║${NC}"
+    echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Create Zivpn (Manual)                         ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Trial Zivpn (Auto)                            ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Back to Main Menu                             ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║                                                      ║${NC}"
+    echo -e "${YELLOW}╚════════════════════════════════════════════════════╝${NC}"
     
     read -p "Enter your choice [0-2]: " choice
 
@@ -313,9 +271,14 @@ function create_account() {
 
 function show_backup_menu() {
     clear
-    local title="Backup / Restore Menu"
-    local items=("1 Backup Data" "2 Restore Data" "3 Auto Backup" "0 Back to Main Menu")
-    draw_menu "$title" "${items[@]}"
+    echo -e "${YELLOW}╔══════════════════// ${RED}Backup / Restore Menu${YELLOW} \\\\═══════════════════╗${NC}"
+    echo -e "${YELLOW}║                                                      ║${NC}"
+    echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Backup Data                                   ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Restore Data                                  ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}3)${NC} ${BOLD_WHITE}Auto Backup                                   ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Back to Main Menu                             ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║                                                      ║${NC}"
+    echo -e "${YELLOW}╚════════════════════════════════════════════════════╝${NC}"
     
     read -p "Enter your choice [0-3]: " choice
     
@@ -332,9 +295,17 @@ function show_menu() {
     clear
     figlet "ZIVPN" | lolcat
     
-    local title="KEDAI SSH"
-    local items=("1 Create Account" "2 Renew Account" "3 Delete Account" "4 Change Domain" "5 List Accounts" "6 Backup / Restore" "0 Exit")
-    draw_menu "$title" "${items[@]}"
+    echo -e "${YELLOW}╔══════════════════// ${RED}KEDAI SSH${YELLOW} \\\\═══════════════════╗${NC}"
+    echo -e "${YELLOW}║                                                      ║${NC}"
+    echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Create Account                                ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Renew Account                                 ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}3)${NC} ${BOLD_WHITE}Delete Account                                ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}4)${NC} ${BOLD_WHITE}Change Domain                                 ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}5)${NC} ${BOLD_WHITE}List Accounts                                 ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}6)${NC} ${BOLD_WHITE}Backup / Restore                              ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Exit                                          ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║                                                      ║${NC}"
+    echo -e "${YELLOW}╚════════════════════════════════════════════════════╝${NC}"
     
     read -p "Enter your choice [0-6]: " choice
 
