@@ -313,9 +313,9 @@ function _draw_service_status() {
     local padding_left=$((padding_total / 2))
     local padding_right=$((padding_total - padding_left))
 
-    echo -e "${YELLOW}║════════════════════════════════════════════════════║${NC}"
-    echo -e "${YELLOW}║$(printf '%*s' $padding_left)${status_output}$(printf '%*s' $padding_right)${YELLOW}║${NC}"
-    echo -e "${YELLOW}║════════════════════════════════════════════════════║${NC}"
+    echo -e "${YELLOW}╔════════════════════════════════════════════════════╗${NC}"
+                       $(printf '%*s' $padding_left)${status_output}$(printf '%*s' $padding_right)
+    echo -e "${YELLOW}╔════════════════════════════════════════════════════╗${NC}"
 
 }
 
@@ -389,7 +389,7 @@ function show_menu() {
     clear
     figlet "UDP ZIVPN" | lolcat
     
-    echo -e "${YELLOW}╔══════════════════// ${RED}KEDAI SSH${YELLOW} //═══════════════════╗${NC}"
+    echo -e "${YELLOW}╔══════════════════// ${CYAN}KEDAI SSH${YELLOW} //═══════════════════╗${NC}"
     _draw_info_panel
     _draw_service_status
     echo -e "${YELLOW}║                                                    ║${NC}"
