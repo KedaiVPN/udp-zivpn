@@ -5,7 +5,7 @@
 # --- UI Definitions ---
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-CYAN='\033[1;36m'
+BOLD_WHITE='\033[1;37m'
 NC='\033[0m' # No Color
 
 # Box drawing characters
@@ -127,17 +127,17 @@ function create_account() {
     clear
     
     # Header
-    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}// ${RED}Create Account${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
+    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}// ${RED}Create Account${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
     
     # Menu Items
-    printf "${YELLOW}${V}${NC} %-40s ${YELLOW}${V}${NC}\n" ""
-    printf "${YELLOW}${V}${NC}   ${RED}1)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Create Zivpn (Manual)"
-    printf "${YELLOW}${V}${NC}   ${RED}2)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Trial Zivpn (Auto)"
-    printf "${YELLOW}${V}${NC}   ${RED}0)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Back to Main Menu"
-    printf "${YELLOW}${V}${NC} %-40s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC} %-49s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC}   ${RED}1)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Create Zivpn (Manual)"
+    printf "${YELLOW}${V}${NC}   ${RED}2)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Trial Zivpn (Auto)"
+    printf "${YELLOW}${V}${NC}   ${RED}0)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Back to Main Menu"
+    printf "${YELLOW}${V}${NC} %-49s ${YELLOW}${V}${NC}\n" ""
 
     # Footer
-    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
+    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
 
     read -p "Enter your choice [0-2]: " choice
 
@@ -289,18 +289,18 @@ function show_backup_menu() {
     clear
 
     # Header
-    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}// ${RED}Backup / Restore Menu${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
+    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}${H}// ${RED}Backup / Restore Menu${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
 
     # Menu Items
-    printf "${YELLOW}${V}${NC} %-40s ${YELLOW}${V}${NC}\n" ""
-    printf "${YELLOW}${V}${NC}   ${RED}1)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Backup Data"
-    printf "${YELLOW}${V}${NC}   ${RED}2)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Restore Data"
-    printf "${YELLOW}${V}${NC}   ${RED}3)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Auto Backup"
-    printf "${YELLOW}${V}${NC}   ${RED}0)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Back to Main Menu"
-    printf "${YELLOW}${V}${NC} %-40s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC} %-49s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC}   ${RED}1)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Backup Data"
+    printf "${YELLOW}${V}${NC}   ${RED}2)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Restore Data"
+    printf "${YELLOW}${V}${NC}   ${RED}3)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Auto Backup"
+    printf "${YELLOW}${V}${NC}   ${RED}0)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Back to Main Menu"
+    printf "${YELLOW}${V}${NC} %-49s ${YELLOW}${V}${NC}\n" ""
 
     # Footer
-    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
+    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
     
     read -p "Enter your choice [0-3]: " choice
     
@@ -315,25 +315,26 @@ function show_backup_menu() {
 
 function show_menu() {
     clear
-    local menu_width=42
+    
+    # Figlet Header
+    figlet "ZIVPN" | lolcat
     
     # Header
-    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}// ${RED}ZIVPN${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
+    echo -e "${YELLOW}${TL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}// ${RED}KEDAI SSH${YELLOW} \\\\${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${TR}${NC}"
     
     # Menu Items
-    printf "${YELLOW}${V}${NC} %-40s ${YELLOW}${V}${NC}\n" ""
-    printf "${YELLOW}${V}${NC}   ${RED}1)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Create Account"
-    printf "${YELLOW}${V}${NC}   ${RED}2)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Renew Account"
-    printf "${YELLOW}${V}${NC}   ${RED}3)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Delete Account"
-    printf "${YELLOW}${V}${NC}   ${RED}4)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Change Domain"
-    printf "${YELLOW}${V}${NC}   ${RED}5)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "List Accounts"
-    printf "${YELLOW}${V}${NC}   ${RED}6)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Backup / Restore"
-    printf "${YELLOW}${V}${NC}   ${RED}0)${NC} ${CYAN}%-35s${NC} ${YELLOW}${V}${NC}\n" "Exit"
-    printf "${YELLOW}${V}${NC} %-40s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC} %-49s ${YELLOW}${V}${NC}\n" ""
+    printf "${YELLOW}${V}${NC}   ${RED}1)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Create Account"
+    printf "${YELLOW}${V}${NC}   ${RED}2)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Renew Account"
+    printf "${YELLOW}${V}${NC}   ${RED}3)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Delete Account"
+    printf "${YELLOW}${V}${NC}   ${RED}4)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Change Domain"
+    printf "${YELLOW}${V}${NC}   ${RED}5)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "List Accounts"
+    printf "${YELLOW}${V}${NC}   ${RED}6)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Backup / Restore"
+    printf "${YELLOW}${V}${NC}   ${RED}0)${NC} ${BOLD_WHITE}%-44s${NC} ${YELLOW}${V}${NC}\n" "Exit"
+    printf "${YELLOW}${V}${NC} %-49s ${YELLOW}${V}${NC}\n" ""
 
     # Footer
-    echo -e "${YELLOW}${ML}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}©KEDAI SSH${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${MR}${NC}"
-    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
+    echo -e "${YELLOW}${BL}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${H}${BR}${NC}"
     
     read -p "Enter your choice [0-6]: " choice
 
@@ -364,9 +365,9 @@ function run_setup() {
     # --- Setting up Advanced Management ---
     echo "--- Setting up Advanced Management ---"
 
-    if ! command -v jq &> /dev/null || ! command -v curl &> /dev/null || ! command -v zip &> /dev/null; then
-        echo "Installing dependencies (jq, curl, zip)..."
-        apt-get update && apt-get install -y jq curl zip
+    if ! command -v jq &> /dev/null || ! command -v curl &> /dev/null || ! command -v zip &> /dev/null || ! command -v figlet &> /dev/null || ! command -v lolcat &> /dev/null; then
+        echo "Installing dependencies (jq, curl, zip, figlet, lolcat)..."
+        apt-get update && apt-get install -y jq curl zip figlet lolcat
     fi
     
     # Download helper script from repository
