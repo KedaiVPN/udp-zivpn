@@ -340,7 +340,7 @@ function _draw_info_panel() {
         iface=$(get_main_interface)
         local current_year current_month current_day
         current_year=$(date +%Y)
-        current_month=$(date +%m)
+        current_month=$(date +%-m) # Use %-m to avoid leading zero
         current_day=$(date +%-d) # Use %-d to avoid leading zero for days < 10
 
         # Daily
