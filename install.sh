@@ -670,16 +670,59 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
 }
 
+# --- Helper Functions ---
+function get_host() {
+    local CERT_CN
+    CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p' 2>/dev/null || echo "")
+    if [ "$CERT_CN" == "zivpn" ] || [ -z "$CERT_CN" ]; then
+        curl -s ifconfig.me
+    else
+        echo "$CERT_CN"
+    fi
+}
+
+function get_isp() {
+    curl -s ipinfo.io | jq -r '.org // "N/A"'
+}
+
+
 # --- Telegram Notification Function ---
 send_telegram_notification() {
-    local message="$1"
+    local message_type="$1"
+    local client_name="$2"
+    local ip_vps="$3"
+    local host="$4"
+    local isp="$5"
+    local exp_date="$6"
+    
+    local message
+    local keyboard
+
+    if [ "$message_type" == "expired" ]; then
+        message="◇━━━━━━━━━━━━━━◇\n"
+        message+=" ⛔SC ZIVPN EXPIRED ⛔\n"
+        message+="◇━━━━━━━━━━━━━━◇\n"
+        message+="IP VPS  : ${ip_vps}\n"
+        message+="HOST  : ${host}\n"
+        message+="ISP     : ${isp}\n"
+        message+="CLIENT : ${client_name}\n"
+        message+="EXP DATE  : ${exp_date}\n"
+        message+="◇━━━━━━━━━━━━━━◇"
+        keyboard='{"inline_keyboard":[[{"text":"Perpanjang Licence","url":"https://t.me/Kedai_vpn"}]]}'
+    else
+        # Fallback for other message types like renewed/revoked
+        message="$7" # The original simple message
+    fi
+    
     if [ -f "$TELEGRAM_CONF" ]; then
         source "$TELEGRAM_CONF"
         if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
-            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-                -d "chat_id=${TELEGRAM_CHAT_ID}" \
-                -d "text=${message}" \
-                -d "parse_mode=Markdown" > /dev/null
+            local api_url="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
+            if [ -n "$keyboard" ]; then
+                curl -s -X POST "$api_url" -d "chat_id=${TELEGRAM_CHAT_ID}" -d "text=${message}" -d "reply_markup=${keyboard}" > /dev/null
+            else
+                curl -s -X POST "$api_url" -d "chat_id=${TELEGRAM_CHAT_ID}" -d "text=${message}" -d "parse_mode=Markdown" > /dev/null
+            fi
             log "Telegram notification sent."
         else
             log "Telegram config found but token or chat ID is missing."
@@ -722,8 +765,8 @@ if [ -z "$license_entry" ]; then
         log "License for IP ${SERVER_IP} has been REVOKED."
         systemctl stop zivpn.service
         touch "$EXPIRED_LOCK_FILE"
-        MSG="Notifikasi Otomatis: Lisensi untuk Klien \`${CLIENT_NAME}\` dengan IP \`${SERVER_IP}\` telah dicabut (REVOKED). Layanan zivpn telah dihentikan."
-        send_telegram_notification "$MSG"
+        local MSG="Notifikasi Otomatis: Lisensi untuk Klien \`${CLIENT_NAME}\` dengan IP \`${SERVER_IP}\` telah dicabut (REVOKED). Layanan zivpn telah dihentikan."
+        send_telegram_notification "revoked" "" "" "" "" "" "$MSG"
     fi
     exit 0
 fi
@@ -749,8 +792,11 @@ if [ "$expiry_timestamp_remote" -le "$current_timestamp" ]; then
         log "License for IP ${SERVER_IP} has EXPIRED."
         systemctl stop zivpn.service
         touch "$EXPIRED_LOCK_FILE"
-        MSG="Notifikasi Otomatis: Lisensi untuk Klien \`${CLIENT_NAME}\` dengan IP \`${SERVER_IP}\` telah kedaluwarsa pada hari ini. Layanan zivpn telah dihentikan."
-        send_telegram_notification "$MSG"
+        local host
+        host=$(get_host)
+        local isp
+        isp=$(get_isp)
+        send_telegram_notification "expired" "$CLIENT_NAME" "$SERVER_IP" "$host" "$isp" "$EXPIRY_DATE"
     fi
 else
     # License is ACTIVE (potentially renewed)
@@ -758,8 +804,8 @@ else
         log "License for IP ${SERVER_IP} has been RENEWED/ACTIVATED."
         rm "$EXPIRED_LOCK_FILE"
         systemctl start zivpn.service
-        MSG="Notifikasi Otomatis: Lisensi untuk Klien \`${CLIENT_NAME}\` dengan IP \`${SERVER_IP}\` telah diperpanjang/diaktifkan kembali. Layanan zivpn telah dimulai."
-        send_telegram_notification "$MSG"
+        local MSG="Notifikasi Otomatis: Lisensi untuk Klien \`${CLIENT_NAME}\` dengan IP \`${SERVER_IP}\` telah diperpanjang/diaktifkan kembali. Layanan zivpn telah dimulai."
+        send_telegram_notification "renewed" "" "" "" "" "" "$MSG"
     else
         log "License is active and valid. No action needed."
     fi
