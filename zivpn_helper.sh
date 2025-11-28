@@ -147,7 +147,7 @@ EOF
         [
             {
                 "text": "Perpanjang Licence",
-                "url": "https://t.me/Kedaivpn"
+                "url": "https://t.me/Kedai_vpn"
             }
         ]
     ]
