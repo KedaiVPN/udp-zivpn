@@ -282,7 +282,7 @@ function _draw_info_panel() {
     fi
     host_info=${host_info:-"N/A"}
 
-    if command -v vnstat &> /dev/null && vnstat --version &> /dev/null; then
+    if true; then
         local iface
         iface=$(get_main_interface)
         local current_year current_month current_day
@@ -290,12 +290,15 @@ function _draw_info_panel() {
         current_month=$(date +%m) 
         current_day=$(date +%d)   
 
+        echo "DEBUG: Interface detected: '$iface'"
+        echo "DEBUG: Date used: Year=$current_year, Month=$current_month, Day=$current_day"
+
         # Daily
         local today_total_kib=0
         local vnstat_daily_json
-        vnstat_daily_json=$(vnstat --json d 2>/dev/null)
+        vnstat_daily_json=$(/usr/bin/vnstat --json d)
         if [[ -n "$vnstat_daily_json" && "$vnstat_daily_json" == "{"* ]]; then
-            today_total_kib=$(echo "$vnstat_daily_json" | jq --arg iface "$iface" --arg year "$current_year" --arg month "$current_month" --arg day "$current_day" '((.interfaces[] | select(.name == $iface) | .traffic.days // [])[] | select(.date.year == ($year|tonumber) and .date.month == ($month|tonumber) and .date.day == ($day|tonumber)) | .rx + .tx) // 0' | head -n 1)
+            today_total_kib=$(echo "$vnstat_daily_json" | jq --arg iface "$iface" --arg year "$current_year" --arg month "$current_month" --arg day "$current_day" '((.interfaces[] | select(.name == $iface) | .traffic.days // [])[] | select(.date.year == ($year|tonumber) and .date.month == ($month|tonumber) and .date.day == ($day|tonumber)) | .total) // 0' | head -n 1)
         fi
         today_total_kib=${today_total_kib:-0} # Default to 0 if empty
         bw_today=$(format_kib_to_human "$today_total_kib")
@@ -303,9 +306,9 @@ function _draw_info_panel() {
         # Monthly
         local month_total_kib=0
         local vnstat_monthly_json
-        vnstat_monthly_json=$(vnstat --json m 2>/dev/null)
+        vnstat_monthly_json=$(/usr/bin/vnstat --json m 2>/dev/null)
         if [[ -n "$vnstat_monthly_json" && "$vnstat_monthly_json" == "{"* ]]; then
-            month_total_kib=$(echo "$vnstat_monthly_json" | jq --arg iface "$iface" --arg year "$current_year" --arg month "$current_month" '((.interfaces[] | select(.name == $iface) | .traffic.months // [])[] | select(.date.year == ($year|tonumber) and .date.month == ($month|tonumber)) | .rx + .tx) // 0' | head -n 1)
+            month_total_kib=$(echo "$vnstat_monthly_json" | jq --arg iface "$iface" --arg year "$current_year" --arg month "$current_month" '((.interfaces[] | select(.name == $iface) | .traffic.months // [])[] | select(.date.year == ($year|tonumber) and .date.month == ($month|tonumber)) | .total) // 0' | head -n 1)
         fi
         month_total_kib=${month_total_kib:-0} # Default to 0 if empty
         bw_month=$(format_kib_to_human "$month_total_kib")
