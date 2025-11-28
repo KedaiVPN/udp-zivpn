@@ -292,14 +292,14 @@ function _draw_info_panel() {
         iface=$(get_main_interface)
         local current_year current_month current_day
         current_year=$(date +%Y)
-        current_month=$(date +%m | sed 's/^0*//')
-        current_day=$(date +%d | sed 's/^0*//')
+        current_month=$(date +%m) # Pass with leading zero as a string
+        current_day=$(date +%d)   # Pass with leading zero as a string
 
         # Daily
         local daily_json
         daily_json=$(vnstat --json d)
         local today_data
-        today_data=$(echo "$daily_json" | jq --arg iface "$iface" --argjson year "$current_year" --argjson month "$current_month" --argjson day "$current_day" '(.interfaces[] | select(.name == $iface) | .traffic.days // [])[] | select(.date.year == $year and .date.month == $month and .date.day == $day)')
+        today_data=$(echo "$daily_json" | jq --arg iface "$iface" --arg year "$current_year" --arg month "$current_month" --arg day "$current_day" '(.interfaces[] | select(.name == $iface) | .traffic.days // [])[] | select(.date.year == ($year|tonumber) and .date.month == ($month|tonumber) and .date.day == ($day|tonumber))')
         local today_rx_kib=0
         local today_tx_kib=0
         if [ -n "$today_data" ]; then
@@ -313,7 +313,7 @@ function _draw_info_panel() {
         local monthly_json
         monthly_json=$(vnstat --json m)
         local month_data
-        month_data=$(echo "$monthly_json" | jq --arg iface "$iface" --argjson year "$current_year" --argjson month "$current_month" '(.interfaces[] | select(.name == $iface) | .traffic.months // [])[] | select(.date.year == $year and .date.month == $month)')
+        month_data=$(echo "$monthly_json" | jq --arg iface "$iface" --arg year "$current_year" --arg month "$current_month" '(.interfaces[] | select(.name == $iface) | .traffic.months // [])[] | select(.date.year == ($year|tonumber) and .date.month == ($month|tonumber))')
         local month_rx_kib=0
         local month_tx_kib=0
         if [ -n "$month_data" ]; then
