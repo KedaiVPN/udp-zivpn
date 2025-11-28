@@ -255,24 +255,8 @@ function format_kib_to_human() {
 }
 
 function get_main_interface() {
-    # Ensure vnstat is available before proceeding.
-    if ! command -v vnstat &> /dev/null; then
-        return
-    fi
-    
-    # Find the interface with the most total traffic to be the most reliable source
-    local vnstat_i_json
-    vnstat_i_json=$(vnstat --json i 2>/dev/null)
-
-    # Check for valid JSON before parsing
-    if [[ -n "$vnstat_i_json" && "$vnstat_i_json" == "{"* ]]; then
-        echo "$vnstat_i_json" | jq -r '
-            .interfaces[]
-            | {name: .name, total_rx: .traffic.total.rx, total_tx: .traffic.total.tx}
-            | select(.total_rx != null and .total_tx != null)
-            | .name
-        ' | head -n 1
-    fi
+    # Find the default network interface using the IP route. This is the most reliable method.
+    ip -o -4 route show to default | awk '{print $5}' | head -n 1
 }
 
 function _draw_info_panel() {
