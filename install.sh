@@ -287,7 +287,7 @@ function _draw_info_panel() {
         local daily_json
         daily_json=$(vnstat --json d)
         local today_data
-        today_data=$(echo "$daily_json" | jq --argjson year "$current_year" --argjson month "$current_month" --argjson day "$current_day" '.interfaces[0].traffic.days[] | select(.date.year == $year and .date.month == $month and .date.day == $day)')
+        today_data=$(echo "$daily_json" | jq --argjson year "$current_year" --argjson month "$current_month" --argjson day "$current_day" '(.interfaces[0].traffic.days // [])[] | select(.date.year == $year and .date.month == $month and .date.day == $day)')
         local today_rx_kib
         today_rx_kib=$(echo "$today_data" | jq '.rx // 0')
         local today_tx_kib
@@ -299,7 +299,7 @@ function _draw_info_panel() {
         local monthly_json
         monthly_json=$(vnstat --json m)
         local month_data
-        month_data=$(echo "$monthly_json" | jq --argjson year "$current_year" --argjson month "$current_month" '.interfaces[0].traffic.months[] | select(.date.year == $year and .date.month == $month)')
+        month_data=$(echo "$monthly_json" | jq --argjson year "$current_year" --argjson month "$current_month" '(.interfaces[0].traffic.months // [])[] | select(.date.year == $year and .date.month == $month)')
         local month_rx_kib
         month_rx_kib=$(echo "$month_data" | jq '.rx // 0')
         local month_tx_kib
