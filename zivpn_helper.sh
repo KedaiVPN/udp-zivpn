@@ -17,12 +17,24 @@ function get_host() {
     fi
 }
 
-function send_telegram_message() {
+function send_telegram_notification() {
     local message="$1"
-    # URL Encode the message
-    local encoded_message
-    encoded_message=$(printf %s "$message" | jq -s -R -r @uri)
-    curl -s -o /dev/null "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${encoded_message}"
+    local keyboard="$2"
+
+    if [ ! -f "$TELEGRAM_CONF" ]; then
+        return 1
+    fi
+    # shellcheck source=/etc/zivpn/telegram.conf
+    source "$TELEGRAM_CONF"
+
+    if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+        local api_url="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
+        if [ -n "$keyboard" ]; then
+            curl -s -X POST "$api_url" -d "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${message}" -d "reply_markup=${keyboard}" > /dev/null
+        else
+            curl -s -X POST "$api_url" -d "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${message}" -d "parse_mode=Markdown" > /dev/null
+        fi
+    fi
 }
 
 # --- Core Functions ---
@@ -101,10 +113,72 @@ Id file    :  ${file_id}
 Silahkan copy id file nya untuk restore
 EOF
 )
-    send_telegram_message "$backup_message"
+    send_telegram_notification "$backup_message"
 
     rm -f "$temp_backup_path"
     echo "Backup process complete."
+}
+
+function handle_expiry_notification() {
+    local host="$1"
+    local ip="$2"
+    local client="$3"
+    local isp="$4"
+    local exp_date="$5"
+
+    local message
+    message=$(cat <<EOF
+◇━━━━━━━━━━━━━━◇
+ ⛔SC ZIVPN EXPIRED ⛔
+◇━━━━━━━━━━━━━━◇
+IP VPS  : ${ip}
+HOST  : ${host}
+ISP     : ${isp}
+CLIENT : ${client}
+EXP DATE  : ${exp_date}
+◇━━━━━━━━━━━━━━◇
+EOF
+)
+
+    local keyboard
+    keyboard=$(cat <<EOF
+{
+    "inline_keyboard": [
+        [
+            {
+                "text": "Perpanjang Licence",
+                "url": "https://t.me/Kedaivpn"
+            }
+        ]
+    ]
+}
+EOF
+)
+    send_telegram_notification "$message" "$keyboard"
+}
+
+function handle_renewed_notification() {
+    local host="$1"
+    local ip="$2"
+    local client="$3"
+    local isp="$4"
+    local remaining_days="$5"
+
+    local message
+    message=$(cat <<EOF
+◇━━━━━━━━━━━━━━◇
+  ✅RENEW SC ZIVPN✅
+◇━━━━━━━━━━━━━━◇
+IP VPS  : ${ip}
+HOST  : ${host}
+ISP     : ${isp}
+CLIENT : ${client}
+EXP : ${remaining_days} Days
+◇━━━━━━━━━━━━━━◇
+EOF
+)
+    # Send without a keyboard
+    send_telegram_notification "$message"
 }
 
 function handle_restore() {
@@ -182,8 +256,22 @@ case "$1" in
     setup-telegram)
         setup_telegram
         ;;
+    expiry-notification)
+        if [ $# -ne 6 ]; then
+            echo "Usage: $0 expiry-notification <host> <ip> <client> <isp> <exp_date>"
+            exit 1
+        fi
+        handle_expiry_notification "$2" "$3" "$4" "$5" "$6"
+        ;;
+    renewed-notification)
+        if [ $# -ne 6 ]; then
+            echo "Usage: $0 renewed-notification <host> <ip> <client> <isp> <remaining_days>"
+            exit 1
+        fi
+        handle_renewed_notification "$2" "$3" "$4" "$5" "$6"
+        ;;
     *)
-        echo "Usage: $0 {backup|restore|setup-telegram}"
+        echo "Usage: $0 {backup|restore|setup-telegram|expiry-notification|renewed-notification}"
         exit 1
         ;;
 esac
