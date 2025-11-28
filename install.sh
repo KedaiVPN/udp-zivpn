@@ -18,6 +18,7 @@ function _print_boxed_message() {
     shift 2
     local message=("$@")
     local max_len=0
+    local min_width=40
 
     for line in "${message[@]}"; do
         # Strip ANSI codes for length calculation
@@ -27,6 +28,11 @@ function _print_boxed_message() {
             max_len=${#clean_line}
         fi
     done
+
+    # Ensure a minimum width for aesthetics
+    if [ $max_len -lt $min_width ]; then
+        max_len=$min_width
+    fi
 
     local horizontal_line
     horizontal_line=$(printf '%*s' "$max_len" | tr ' ' '═')
@@ -73,7 +79,7 @@ function verify_license() {
     license_entry=$(echo "$license_data" | grep -w "$SERVER_IP")
 
     if [ -z "$license_entry" ]; then
-        _print_boxed_message "$YELLOW" "$RED" "Instalasi tidak dapat dilanjutkan!" "Anda tidak memiliki izin instalasi." "IP Server Anda: ${SERVER_IP}"
+        _print_boxed_message "$YELLOW" "$RED" "Verifikasi Lisensi Gagal!" "IP Anda tidak terdaftar." "IP: ${SERVER_IP}"
         exit 1
     fi
 
@@ -88,11 +94,11 @@ function verify_license() {
     current_timestamp=$(date +%s)
 
     if [ "$expiry_timestamp" -le "$current_timestamp" ]; then
-        _print_boxed_message "$YELLOW" "$RED" "Lisensi untuk IP ${SERVER_IP} telah kedaluwarsa." "Tanggal Kedaluwarsa: ${expiry_date_str}" "Instalasi dibatalkan."
+        _print_boxed_message "$YELLOW" "$RED" "Verifikasi Lisensi Gagal!" "Lisensi untuk IP ${SERVER_IP} telah kedaluwarsa." "Tanggal Kedaluwarsa: ${expiry_date_str}"
         exit 1
     fi
     
-    _print_boxed_message "$CYAN" "$LIGHT_GREEN" "Verifikasi Lisensi Berhasil!" "Klien Terdaftar: ${client_name}"
+    _print_boxed_message "$CYAN" "$LIGHT_GREEN" "Verifikasi Lisensi Berhasil!" "Client: ${client_name}" "IP: ${SERVER_IP}"
     sleep 2 # Brief pause to show the message
     
     mkdir -p /etc/zivpn
