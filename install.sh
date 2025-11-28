@@ -513,7 +513,7 @@ function show_expired_message_and_exit() {
     echo -e "${BOLD_WHITE}Akses ke layanan ZIVPN di server anda telah dihentikan."
     echo -e "Segala aktivitas VPN tidak akan berfungsi lagi.\n"
     echo -e "Untuk memperpanjang lisensi dan mengaktifkan kembali layanan,"
-    echo -e "silakan hubungi admin https://wa.me/6287777694482\n"
+    echo -e "silakan hubungi admin https://wa.me/6287777694482 \n"
     echo -e "${LIGHT_GREEN}Setelah diperpanjang, layanan akan aktif kembali secara otomatis.${NC}\n"
     exit 0
 }
@@ -781,8 +781,7 @@ else
         host=$(get_host)
         local isp
         isp=$(get_isp)
-        local remaining_seconds=$((expiry_timestamp_remote - current_timestamp))
-        local remaining_days=$((remaining_seconds / 86400))
+        local remaining_days=$(((expiry_timestamp_remote - current_timestamp) / 86400))
         log "Sending rich renewed notification via helper script..."
         /usr/local/bin/zivpn_helper.sh renewed-notification "$host" "$SERVER_IP" "$CLIENT_NAME" "$isp" "$remaining_days"
     else
