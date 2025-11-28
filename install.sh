@@ -8,7 +8,39 @@ RED='\033[0;31m'
 BOLD_WHITE='\033[1;37m'
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
+LIGHT_GREEN='\033[1;32m'
 NC='\033[0m' # No Color
+
+# --- UI Helper Function ---
+function _print_boxed_message() {
+    local border_color="$1"
+    local text_color="$2"
+    shift 2
+    local message=("$@")
+    local max_len=0
+
+    for line in "${message[@]}"; do
+        # Strip ANSI codes for length calculation
+        local clean_line
+        clean_line=$(echo -e "$line" | sed 's/\x1b\[[0-9;]*m//g')
+        if [ ${#clean_line} -gt $max_len ]; then
+            max_len=${#clean_line}
+        fi
+    done
+
+    local horizontal_line
+    horizontal_line=$(printf '%*s' "$max_len" | tr ' ' '═')
+
+    echo -e "${border_color}╔═${horizontal_line}═╗${NC}"
+    for line in "${message[@]}"; do
+        local clean_line
+        clean_line=$(echo -e "$line" | sed 's/\x1b\[[0-9;]*m//g')
+        local padding=$((max_len - ${#clean_line}))
+        echo -e "${border_color}║ ${text_color}${line}$(printf '%*s' "$padding")${border_color} ║${NC}"
+    done
+    echo -e "${border_color}╚═${horizontal_line}═╝${NC}"
+}
+
 
 # --- License Info ---
 LICENSE_URL="https://raw.githubusercontent.com/kedaivpn/izin/main/ip"
@@ -33,7 +65,7 @@ function verify_license() {
     local license_data
     license_data=$(curl -s "$LICENSE_URL")
     if [ $? -ne 0 ] || [ -z "$license_data" ]; then
-        echo -e "${RED}Gagal terhubung ke server lisensi. Mohon periksa koneksi internet Anda.${NC}"
+        _print_boxed_message "$YELLOW" "$RED" "Gagal terhubung ke server lisensi." "Mohon periksa koneksi internet Anda."
         exit 1
     fi
 
@@ -41,8 +73,7 @@ function verify_license() {
     license_entry=$(echo "$license_data" | grep -w "$SERVER_IP")
 
     if [ -z "$license_entry" ]; then
-        echo -e "${RED}Instalasi tidak dapat dilanjutkan, karena anda tidak memiliki izin instalasi.${NC}"
-        echo -e "${RED}IP Server Anda: ${SERVER_IP}${NC}"
+        _print_boxed_message "$YELLOW" "$RED" "Instalasi tidak dapat dilanjutkan!" "Anda tidak memiliki izin instalasi." "IP Server Anda: ${SERVER_IP}"
         exit 1
     fi
 
@@ -57,12 +88,12 @@ function verify_license() {
     current_timestamp=$(date +%s)
 
     if [ "$expiry_timestamp" -le "$current_timestamp" ]; then
-        echo -e "${RED}Lisensi untuk IP ${SERVER_IP} telah kedaluwarsa pada ${expiry_date_str}.${NC}"
-        echo -e "${RED}Instalasi dibatalkan.${NC}"
+        _print_boxed_message "$YELLOW" "$RED" "Lisensi untuk IP ${SERVER_IP} telah kedaluwarsa." "Tanggal Kedaluwarsa: ${expiry_date_str}" "Instalasi dibatalkan."
         exit 1
     fi
-
-    echo -e "${GREEN}License verified successfully for client: ${client_name}${NC}"
+    
+    _print_boxed_message "$CYAN" "$LIGHT_GREEN" "Verifikasi Lisensi Berhasil!" "Klien Terdaftar: ${client_name}"
+    sleep 2 # Brief pause to show the message
     
     mkdir -p /etc/zivpn
     echo "CLIENT_NAME=${client_name}" > "$LICENSE_INFO_FILE"
