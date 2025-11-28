@@ -11,43 +11,6 @@ GREEN='\033[0;32m'
 LIGHT_GREEN='\033[1;32m'
 NC='\033[0m' # No Color
 
-# --- UI Helper Function ---
-function _print_boxed_message() {
-    local border_color="$1"
-    local text_color="$2"
-    shift 2
-    local message=("$@")
-    local max_len=0
-    local min_width=40
-
-    for line in "${message[@]}"; do
-        # Strip ANSI codes for length calculation
-        local clean_line
-        clean_line=$(echo -e "$line" | sed 's/\x1b\[[0-9;]*m//g')
-        if [ ${#clean_line} -gt $max_len ]; then
-            max_len=${#clean_line}
-        fi
-    done
-
-    # Ensure a minimum width for aesthetics
-    if [ $max_len -lt $min_width ]; then
-        max_len=$min_width
-    fi
-
-    local horizontal_line
-    horizontal_line=$(printf '%*s' "$max_len" | tr ' ' '═')
-
-    echo -e "${border_color}╔═${horizontal_line}═╗${NC}"
-    for line in "${message[@]}"; do
-        local clean_line
-        clean_line=$(echo -e "$line" | sed 's/\x1b\[[0-9;]*m//g')
-        local padding=$((max_len - ${#clean_line}))
-        echo -e "${border_color}║ ${text_color}${line}$(printf '%*s' "$padding")${border_color} ║${NC}"
-    done
-    echo -e "${border_color}╚═${horizontal_line}═╝${NC}"
-}
-
-
 # --- License Info ---
 LICENSE_URL="https://raw.githubusercontent.com/kedaivpn/izin/main/ip"
 LICENSE_INFO_FILE="/etc/zivpn/.license_info"
@@ -71,7 +34,7 @@ function verify_license() {
     local license_data
     license_data=$(curl -s "$LICENSE_URL")
     if [ $? -ne 0 ] || [ -z "$license_data" ]; then
-        _print_boxed_message "$YELLOW" "$RED" "Gagal terhubung ke server lisensi." "Mohon periksa koneksi internet Anda."
+        echo -e "${RED}Gagal terhubung ke server lisensi. Mohon periksa koneksi internet Anda.${NC}"
         exit 1
     fi
 
@@ -79,7 +42,7 @@ function verify_license() {
     license_entry=$(echo "$license_data" | grep -w "$SERVER_IP")
 
     if [ -z "$license_entry" ]; then
-        _print_boxed_message "$YELLOW" "$RED" "Verifikasi Lisensi Gagal!" "IP Anda tidak terdaftar." "IP: ${SERVER_IP}"
+        echo -e "${RED}Verifikasi Lisensi Gagal! IP Anda tidak terdaftar. IP: ${SERVER_IP}${NC}"
         exit 1
     fi
 
@@ -94,11 +57,11 @@ function verify_license() {
     current_timestamp=$(date +%s)
 
     if [ "$expiry_timestamp" -le "$current_timestamp" ]; then
-        _print_boxed_message "$YELLOW" "$RED" "Verifikasi Lisensi Gagal!" "Lisensi untuk IP ${SERVER_IP} telah kedaluwarsa." "Tanggal Kedaluwarsa: ${expiry_date_str}"
+        echo -e "${RED}Verifikasi Lisensi Gagal! Lisensi untuk IP ${SERVER_IP} telah kedaluwarsa. Tanggal Kedaluwarsa: ${expiry_date_str}${NC}"
         exit 1
     fi
     
-    _print_boxed_message "$CYAN" "$LIGHT_GREEN" "Verifikasi Lisensi Berhasil!" "Client: ${client_name}" "IP: ${SERVER_IP}"
+    echo -e "${LIGHT_GREEN}Verifikasi Lisensi Berhasil! Client: ${client_name}, IP: ${SERVER_IP}${NC}"
     sleep 2 # Brief pause to show the message
     
     mkdir -p /etc/zivpn
