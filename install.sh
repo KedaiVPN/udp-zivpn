@@ -314,7 +314,7 @@ function get_main_interface() {
 
 function _draw_info_panel() {
     # --- Fetch Data ---
-    local os_info isp_info ip_info host_info bw_today bw_month
+    local os_info isp_info ip_info host_info bw_today bw_month client_name license_exp
 
     os_info=$( (hostnamectl 2>/dev/null | grep "Operating System" | cut -d: -f2 | sed 's/^[ \t]*//') || echo "N/A" )
     os_info=${os_info:-"N/A"}
@@ -368,9 +368,34 @@ function _draw_info_panel() {
         bw_month="N/A"
     fi
 
+    # --- License Info ---
+    if [ -f "$LICENSE_INFO_FILE" ]; then
+        source "$LICENSE_INFO_FILE" # Loads CLIENT_NAME and EXPIRY_DATE
+        client_name=${CLIENT_NAME:-"N/A"}
+        
+        if [ -n "$EXPIRY_DATE" ]; then
+            local expiry_timestamp
+            expiry_timestamp=$(date -d "$EXPIRY_DATE" +%s)
+            local current_timestamp
+            current_timestamp=$(date +%s)
+            local remaining_seconds=$((expiry_timestamp - current_timestamp))
+            if [ $remaining_seconds -gt 0 ]; then
+                license_exp="$((remaining_seconds / 86400)) days"
+            else
+                license_exp="Expired"
+            fi
+        else
+            license_exp="N/A"
+        fi
+    else
+        client_name="N/A"
+        license_exp="N/A"
+    fi
+
     # --- Print Panel ---
     printf "  ${RED}%-7s${BOLD_WHITE}%-18s ${RED}%-6s${BOLD_WHITE}%-19s${NC}\n" "OS:" "${os_info}" "ISP:" "${isp_info}"
     printf "  ${RED}%-7s${BOLD_WHITE}%-18s ${RED}%-6s${BOLD_WHITE}%-19s${NC}\n" "IP:" "${ip_info}" "Host:" "${host_info}"
+    printf "  ${RED}%-7s${BOLD_WHITE}%-18s ${RED}%-6s${BOLD_WHITE}%-19s${NC}\n" "Client:" "${client_name}" "EXP:" "${license_exp}"
     printf "  ${RED}%-7s${BOLD_WHITE}%-18s ${RED}%-6s${BOLD_WHITE}%-19s${NC}\n" "Today:" "${bw_today}" "Month:" "${bw_month}"
 }
 
