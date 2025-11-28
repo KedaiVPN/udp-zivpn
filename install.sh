@@ -242,15 +242,12 @@ function list_accounts() {
 
 function format_kib_to_human() {
     local kib=$1
-    if ! [[ "$kib" =~ ^[0-9]+$ ]] || [ -z "$kib" ] || [ "$kib" -le 0 ]; then
-        echo "0 B"
-        return
+    if ! [[ "$kib" =~ ^[0-9]+$ ]] || [ -z "$kib" ]; then
+        kib=0
     fi
     
-    # Using awk for floating point math to avoid installing 'bc'
-    if [ "$kib" -lt 1024 ]; then
-        echo "${kib} KiB"
-    elif [ "$kib" -lt 1048576 ]; then
+    # Using awk for floating point math
+    if [ "$kib" -lt 1048576 ]; then
         awk -v val="$kib" 'BEGIN { printf "%.2f MiB", val / 1024 }'
     else
         awk -v val="$kib" 'BEGIN { printf "%.2f GiB", val / 1048576 }'
@@ -281,33 +278,32 @@ function _draw_info_panel() {
     host_info=${host_info:-"N/A"}
 
     if command -v vnstat &> /dev/null && vnstat --version &> /dev/null; then
-        local daily_json monthly_json
-        daily_json=$(vnstat --json d 1)
-        monthly_json=$(vnstat --json m 1)
+        local current_year current_month current_day
+        current_year=$(date +%Y)
+        current_month=$(date +%-m)
+        current_day=$(date +%-d)
 
         # Daily
-        local today_rx_kib=0 today_tx_kib=0
-        local vnstat_day
-        vnstat_day=$(echo "$daily_json" | jq '.interfaces[0].traffic.days[0].date.day // 0')
-        local current_day
-        current_day=$(date +%d | sed 's/^0*//')
-        if [[ "$vnstat_day" -eq "$current_day" ]]; then
-            today_rx_kib=$(echo "$daily_json" | jq '.interfaces[0].traffic.days[0].rx // 0')
-            today_tx_kib=$(echo "$daily_json" | jq '.interfaces[0].traffic.days[0].tx // 0')
-        fi
+        local daily_json
+        daily_json=$(vnstat --json d)
+        local today_data
+        today_data=$(echo "$daily_json" | jq --argjson year "$current_year" --argjson month "$current_month" --argjson day "$current_day" '.interfaces[0].traffic.days[] | select(.date.year == $year and .date.month == $month and .date.day == $day)')
+        local today_rx_kib
+        today_rx_kib=$(echo "$today_data" | jq '.rx // 0')
+        local today_tx_kib
+        today_tx_kib=$(echo "$today_data" | jq '.tx // 0')
         local today_total_kib=$((today_rx_kib + today_tx_kib))
         bw_today=$(format_kib_to_human "$today_total_kib")
 
         # Monthly
-        local month_rx_kib=0 month_tx_kib=0
-        local vnstat_month
-        vnstat_month=$(echo "$monthly_json" | jq '.interfaces[0].traffic.months[0].date.month // 0')
-        local current_month
-        current_month=$(date +%m | sed 's/^0*//')
-        if [[ "$vnstat_month" -eq "$current_month" ]]; then
-            month_rx_kib=$(echo "$monthly_json" | jq '.interfaces[0].traffic.months[0].rx // 0')
-            month_tx_kib=$(echo "$monthly_json" | jq '.interfaces[0].traffic.months[0].tx // 0')
-        fi
+        local monthly_json
+        monthly_json=$(vnstat --json m)
+        local month_data
+        month_data=$(echo "$monthly_json" | jq --argjson year "$current_year" --argjson month "$current_month" '.interfaces[0].traffic.months[] | select(.date.year == $year and .date.month == $month)')
+        local month_rx_kib
+        month_rx_kib=$(echo "$month_data" | jq '.rx // 0')
+        local month_tx_kib
+        month_tx_kib=$(echo "$month_data" | jq '.tx // 0')
         local month_total_kib=$((month_rx_kib + month_tx_kib))
         bw_month=$(format_kib_to_human "$month_total_kib")
 
