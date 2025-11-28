@@ -408,7 +408,7 @@ function _draw_service_status() {
 
     if [ "$service_status" = "active" ]; then
         status_text="Running"
-        status_color="${GREEN}"
+        status_color="${LIGHT_GREEN}"
     elif [ "$service_status" = "inactive" ]; then
         status_text="Stopped"
         status_color="${RED}"
