@@ -10,11 +10,64 @@ CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
+# --- License Info ---
+LICENSE_URL="https://raw.githubusercontent.com/kedaivpn/izin/main/ip"
+LICENSE_INFO_FILE="/etc/zivpn/.license_info"
+
 # --- Pre-flight Checks ---
 if [ "$(id -u)" -ne 0 ]; then
   echo "This script must be run as root. Please use sudo or run as root user." >&2
   exit 1
 fi
+
+# --- License Verification Function ---
+function verify_license() {
+    echo "Verifying installation license..."
+    local SERVER_IP
+    SERVER_IP=$(curl -s ifconfig.me)
+    if [ -z "$SERVER_IP" ]; then
+        echo -e "${RED}Failed to retrieve server IP. Please check your internet connection.${NC}"
+        exit 1
+    fi
+
+    local license_data
+    license_data=$(curl -s "$LICENSE_URL")
+    if [ $? -ne 0 ] || [ -z "$license_data" ]; then
+        echo -e "${RED}Gagal terhubung ke server lisensi. Mohon periksa koneksi internet Anda.${NC}"
+        exit 1
+    fi
+
+    local license_entry
+    license_entry=$(echo "$license_data" | grep -w "$SERVER_IP")
+
+    if [ -z "$license_entry" ]; then
+        echo -e "${RED}Instalasi tidak dapat dilanjutkan, karena anda tidak memiliki izin instalasi.${NC}"
+        echo -e "${RED}IP Server Anda: ${SERVER_IP}${NC}"
+        exit 1
+    fi
+
+    local client_name
+    local expiry_date_str
+    client_name=$(echo "$license_entry" | awk '{print $1}')
+    expiry_date_str=$(echo "$license_entry" | awk '{print $2}')
+
+    local expiry_timestamp
+    expiry_timestamp=$(date -d "$expiry_date_str" +%s)
+    local current_timestamp
+    current_timestamp=$(date +%s)
+
+    if [ "$expiry_timestamp" -le "$current_timestamp" ]; then
+        echo -e "${RED}Lisensi untuk IP ${SERVER_IP} telah kedaluwarsa pada ${expiry_date_str}.${NC}"
+        echo -e "${RED}Instalasi dibatalkan.${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}License verified successfully for client: ${client_name}${NC}"
+
+    mkdir -p /etc/zivpn
+    echo "CLIENT_NAME=${client_name}" > "$LICENSE_INFO_FILE"
+    echo "EXPIRY_DATE=${expiry_date_str}" >> "$LICENSE_INFO_FILE"
+}
 
 # --- Utility Functions ---
 function restart_zivpn() {
@@ -423,7 +476,25 @@ function show_backup_menu() {
     esac
 }
 
+function show_expired_message_and_exit() {
+    clear
+    echo -e "\n${RED}=====================================================${NC}"
+    echo -e "${RED}           LISENSI ANDA TELAH KEDALUWARSA!           ${NC}"
+    echo -e "${RED}=====================================================${NC}\n"
+    echo -e "${BOLD_WHITE}Akses ke layanan ZIVPN di server ini telah dihentikan."
+    echo -e "Segala aktivitas VPN tidak akan berfungsi lagi.\n"
+    echo -e "Untuk memperpanjang lisensi dan mengaktifkan kembali layanan,"
+    echo -e "silakan hubungi administrator Anda.\n"
+    echo -e "${CYAN}Sistem akan memeriksa pembaruan lisensi secara otomatis setiap jam.${NC}"
+    echo -e "${CYAN}Setelah diperpanjang, layanan akan aktif kembali secara otomatis.${NC}\n"
+    exit 0
+}
+
 function show_menu() {
+    if [ -f "/etc/zivpn/.expired" ]; then
+        show_expired_message_and_exit
+    fi
+
     clear
     figlet "UDP ZIVPN" | lolcat
     
@@ -457,6 +528,8 @@ function show_menu() {
 
 # --- Main Installation and Setup Logic ---
 function run_setup() {
+    verify_license # <-- VERIFY LICENSE HERE
+
     # --- Run Base Installation ---
     echo "--- Starting Base Installation ---"
     wget -O zi.sh https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/zi.sh
@@ -550,6 +623,129 @@ EOF
     (crontab -l 2>/dev/null | grep -v "# zivpn-expiry-check") | crontab -
     (crontab -l 2>/dev/null; echo "$CRON_JOB_EXPIRY") | crontab -
 
+    echo "Setting up license check script and cron job..."
+    cat <<'EOF' > /etc/zivpn/license_checker.sh
+#!/bin/bash
+# Zivpn License Checker
+# This script is run by a cron job to periodically check the license status.
+
+# --- Configuration ---
+LICENSE_URL="https://raw.githubusercontent.com/kedaivpn/izin/main/ip"
+LICENSE_INFO_FILE="/etc/zivpn/.license_info"
+EXPIRED_LOCK_FILE="/etc/zivpn/.expired"
+TELEGRAM_CONF="/etc/zivpn/telegram.conf"
+LOG_FILE="/var/log/zivpn_license.log"
+
+# --- Logging ---
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
+}
+
+# --- Telegram Notification Function ---
+send_telegram_notification() {
+    local message="$1"
+    if [ -f "$TELEGRAM_CONF" ]; then
+        source "$TELEGRAM_CONF"
+        if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+                -d "chat_id=${TELEGRAM_CHAT_ID}" \
+                -d "text=${message}" \
+                -d "parse_mode=Markdown" > /dev/null
+            log "Telegram notification sent."
+        else
+            log "Telegram config found but token or chat ID is missing."
+        fi
+    else
+        log "Telegram config not found, skipping notification."
+    fi
+}
+
+# --- Main Logic ---
+log "Starting license check..."
+
+# 1. Get Server IP
+SERVER_IP=$(curl -s ifconfig.me)
+if [ -z "$SERVER_IP" ]; then
+    log "Error: Failed to retrieve server IP. Exiting."
+    exit 1
+fi
+
+# 2. Get Local License Info
+if [ ! -f "$LICENSE_INFO_FILE" ]; then
+    log "Error: Local license info file not found. Exiting."
+    exit 1
+fi
+source "$LICENSE_INFO_FILE" # This loads CLIENT_NAME and EXPIRY_DATE
+
+# 3. Fetch Remote License Data
+license_data=$(curl -s "$LICENSE_URL")
+if [ $? -ne 0 ] || [ -z "$license_data" ]; then
+    log "Error: Failed to connect to license server. Exiting."
+    exit 1
+fi
+
+# 4. Check License Status from Remote
+license_entry=$(echo "$license_data" | grep -w "$SERVER_IP")
+
+if [ -z "$license_entry" ]; then
+    # IP not found in remote list (Revoked)
+    if [ ! -f "$EXPIRED_LOCK_FILE" ]; then
+        log "License for IP ${SERVER_IP} has been REVOKED."
+        systemctl stop zivpn.service
+        touch "$EXPIRED_LOCK_FILE"
+        MSG="Notifikasi Otomatis: Lisensi untuk Klien \`${CLIENT_NAME}\` dengan IP \`${SERVER_IP}\` telah dicabut (REVOKED). Layanan zivpn telah dihentikan."
+        send_telegram_notification "$MSG"
+    fi
+    exit 0
+fi
+
+# 5. IP Found, Check for Expiry or Renewal
+client_name_remote=$(echo "$license_entry" | awk '{print $1}')
+expiry_date_remote=$(echo "$license_entry" | awk '{print $2}')
+expiry_timestamp_remote=$(date -d "$expiry_date_remote" +%s)
+current_timestamp=$(date +%s)
+
+# Update local license info file with the latest from server
+if [ "$expiry_date_remote" != "$EXPIRY_DATE" ]; then
+    log "Remote license has a different expiry date (${expiry_date_remote}). Updating local file."
+    echo "CLIENT_NAME=${client_name_remote}" > "$LICENSE_INFO_FILE"
+    echo "EXPIRY_DATE=${expiry_date_remote}" >> "$LICENSE_INFO_FILE"
+    CLIENT_NAME=$client_name_remote
+    EXPIRY_DATE=$expiry_date_remote
+fi
+
+if [ "$expiry_timestamp_remote" -le "$current_timestamp" ]; then
+    # License is EXPIRED
+    if [ ! -f "$EXPIRED_LOCK_FILE" ]; then
+        log "License for IP ${SERVER_IP} has EXPIRED."
+        systemctl stop zivpn.service
+        touch "$EXPIRED_LOCK_FILE"
+        MSG="Notifikasi Otomatis: Lisensi untuk Klien \`${CLIENT_NAME}\` dengan IP \`${SERVER_IP}\` telah kedaluwarsa pada hari ini. Layanan zivpn telah dihentikan."
+        send_telegram_notification "$MSG"
+    fi
+else
+    # License is ACTIVE (potentially renewed)
+    if [ -f "$EXPIRED_LOCK_FILE" ]; then
+        log "License for IP ${SERVER_IP} has been RENEWED/ACTIVATED."
+        rm "$EXPIRED_LOCK_FILE"
+        systemctl start zivpn.service
+        MSG="Notifikasi Otomatis: Lisensi untuk Klien \`${CLIENT_NAME}\` dengan IP \`${SERVER_IP}\` telah diperpanjang/diaktifkan kembali. Layanan zivpn telah dimulai."
+        send_telegram_notification "$MSG"
+    else
+        log "License is active and valid. No action needed."
+    fi
+fi
+
+log "License check finished."
+exit 0
+EOF
+    chmod +x /etc/zivpn/license_checker.sh
+
+    CRON_JOB_LICENSE="0 * * * * /etc/zivpn/license_checker.sh # zivpn-license-check"
+    (crontab -l 2>/dev/null | grep -v "# zivpn-license-check") | crontab -
+    (crontab -l 2>/dev/null; echo "$CRON_JOB_LICENSE") | crontab -
+
+
     restart_zivpn
 
     # --- System Integration ---
@@ -580,6 +776,9 @@ EOF
 function main() {
     if [ ! -f "/etc/systemd/system/zivpn.service" ]; then
         run_setup
+    else
+        # If already installed, still verify license before showing menu
+        verify_license
     fi
 
     while true; do

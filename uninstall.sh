@@ -13,14 +13,20 @@ rm /etc/systemd/system/zivpn.service 1> /dev/null 2> /dev/null
 # Kill any running process
 killall zivpn 1> /dev/null 2> /dev/null
 
-# Remove directories and binaries
-rm -rf /etc/zivpn 1> /dev/null 2> /dev/null
-rm /usr/local/bin/zivpn 1> /dev/null 2> /dev/null
-rm /usr/local/bin/zivpn-manager 1> /dev/null 2> /dev/null
-rm /usr/local/bin/zivpn_helper.sh 1> /dev/null 2> /dev/null
+# Remove directories, binaries, and license files
+rm -f /etc/zivpn/license_checker.sh 1> /dev/null 2> /dev/null
+rm -f /etc/zivpn/.license_info 1> /dev/null 2> /dev/null
+rm -f /etc/zivpn/.expired 1> /dev/null 2> /dev/null
+rm -rf /etc/zivpn 1> /dev/null 2> /dev/null # Finally remove the whole directory
+rm -f /usr/local/bin/zivpn 1> /dev/null 2> /dev/null
+rm -f /usr/local/bin/zivpn-manager 1> /dev/null 2> /dev/null
+rm -f /usr/local/bin/zivpn_helper.sh 1> /dev/null 2> /dev/null
 
-# Remove cron jobs
-(crontab -l 2>/dev/null | grep -v "zivpn") | crontab -
+# Remove specific cron jobs
+(crontab -l 2>/dev/null | grep -v "# zivpn-expiry-check") | crontab -
+(crontab -l 2>/dev/null | grep -v "# zivpn-license-check") | crontab -
+(crontab -l 2>/dev/null | grep -v "# zivpn-auto-backup") | crontab -
+
 
 # Remove system integration from shell profiles
 PROFILE_FILES=("/root/.bashrc" "/root/.bash_profile")
