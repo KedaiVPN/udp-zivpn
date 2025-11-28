@@ -687,48 +687,21 @@ function get_isp() {
 
 
 # --- Telegram Notification Function ---
-send_telegram_notification() {
-    local message_type="$1"
-    local client_name="$2"
-    local ip_vps="$3"
-    local host="$4"
-    local isp="$5"
-    local exp_date="$6"
+send_telegram_message() {
+    local message="$1"
     
-    local message
-    local keyboard
-
-    if [ "$message_type" == "expired" ]; then
-        message="◇━━━━━━━━━━━━━━◇\n"
-        message+=" ⛔SC ZIVPN EXPIRED ⛔\n"
-        message+="◇━━━━━━━━━━━━━━◇\n"
-        message+="IP VPS  : ${ip_vps}\n"
-        message+="HOST  : ${host}\n"
-        message+="ISP     : ${isp}\n"
-        message+="CLIENT : ${client_name}\n"
-        message+="EXP DATE  : ${exp_date}\n"
-        message+="◇━━━━━━━━━━━━━━◇"
-        keyboard='{"inline_keyboard":[[{"text":"Perpanjang Licence","url":"https://t.me/Kedai_vpn"}]]}'
-    else
-        # Fallback for other message types like renewed/revoked
-        message="$7" # The original simple message
+    if [ ! -f "$TELEGRAM_CONF" ]; then
+        log "Telegram config not found, skipping notification."
+        return
     fi
     
-    if [ -f "$TELEGRAM_CONF" ]; then
-        source "$TELEGRAM_CONF"
-        if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
-            local api_url="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
-            if [ -n "$keyboard" ]; then
-                curl -s -X POST "$api_url" -d "chat_id=${TELEGRAM_CHAT_ID}" -d "text=${message}" -d "reply_markup=${keyboard}" > /dev/null
-            else
-                curl -s -X POST "$api_url" -d "chat_id=${TELEGRAM_CHAT_ID}" -d "text=${message}" -d "parse_mode=Markdown" > /dev/null
-            fi
-            log "Telegram notification sent."
-        else
-            log "Telegram config found but token or chat ID is missing."
-        fi
+    source "$TELEGRAM_CONF"
+    if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+        local api_url="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
+        curl -s -X POST "$api_url" -d "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${message}" -d "parse_mode=Markdown" > /dev/null
+        log "Simple telegram notification sent."
     else
-        log "Telegram config not found, skipping notification."
+        log "Telegram config found but token or chat ID is missing."
     fi
 }
 
@@ -766,7 +739,7 @@ if [ -z "$license_entry" ]; then
         systemctl stop zivpn.service
         touch "$EXPIRED_LOCK_FILE"
         local MSG="Notifikasi Otomatis: Lisensi untuk Klien \`${CLIENT_NAME}\` dengan IP \`${SERVER_IP}\` telah dicabut (REVOKED). Layanan zivpn telah dihentikan."
-        send_telegram_notification "revoked" "" "" "" "" "" "$MSG"
+        send_telegram_message "$MSG"
     fi
     exit 0
 fi
@@ -796,7 +769,8 @@ if [ "$expiry_timestamp_remote" -le "$current_timestamp" ]; then
         host=$(get_host)
         local isp
         isp=$(get_isp)
-        send_telegram_notification "expired" "$CLIENT_NAME" "$SERVER_IP" "$host" "$isp" "$EXPIRY_DATE"
+        log "Sending rich expiry notification via helper script..."
+        /usr/local/bin/zivpn_helper.sh expiry-notification "$host" "$SERVER_IP" "$CLIENT_NAME" "$isp" "$EXPIRY_DATE"
     fi
 else
     # License is ACTIVE (potentially renewed)
@@ -804,8 +778,14 @@ else
         log "License for IP ${SERVER_IP} has been RENEWED/ACTIVATED."
         rm "$EXPIRED_LOCK_FILE"
         systemctl start zivpn.service
-        local MSG="Notifikasi Otomatis: Lisensi untuk Klien \`${CLIENT_NAME}\` dengan IP \`${SERVER_IP}\` telah diperpanjang/diaktifkan kembali. Layanan zivpn telah dimulai."
-        send_telegram_notification "renewed" "" "" "" "" "" "$MSG"
+        local host
+        host=$(get_host)
+        local isp
+        isp=$(get_isp)
+        local remaining_seconds=$((expiry_timestamp_remote - current_timestamp))
+        local remaining_days=$((remaining_seconds / 86400))
+        log "Sending rich renewed notification via helper script..."
+        /usr/local/bin/zivpn_helper.sh renewed-notification "$host" "$SERVER_IP" "$CLIENT_NAME" "$isp" "$remaining_days"
     else
         log "License is active and valid. No action needed."
     fi
