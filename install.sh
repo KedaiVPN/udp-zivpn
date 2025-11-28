@@ -6,6 +6,8 @@
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 BOLD_WHITE='\033[1;37m'
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
 # --- Pre-flight Checks ---
@@ -114,7 +116,10 @@ function create_trial_account() {
 }
 
 function renew_account() {
+    clear
     echo "--- Renew Account ---"
+    _display_accounts
+    echo "" # Add a newline for better spacing
     read -p "Enter password to renew: " password
     if [ -z "$password" ]; then
         echo "Password cannot be empty."
@@ -155,7 +160,10 @@ function renew_account() {
 }
 
 function delete_account() {
+    clear
     echo "--- Delete Account ---"
+    _display_accounts
+    echo "" # Add a newline for better spacing
     read -p "Enter password to delete: " password
     if [ -z "$password" ]; then
         echo "Password cannot be empty."
@@ -198,8 +206,7 @@ function change_domain() {
     restart_zivpn
 }
 
-function list_accounts() {
-    echo "--- Active Accounts ---"
+function _display_accounts() {
     local db_file="/etc/zivpn/users.db"
 
     if [ ! -f "$db_file" ] || [ ! -s "$db_file" ]; then
@@ -223,6 +230,144 @@ function list_accounts() {
         fi
     done < "$db_file"
     echo "------------------------------------------"
+}
+
+function list_accounts() {
+    clear
+    echo "--- Active Accounts ---"
+    _display_accounts
+    echo "" # Add a newline for better spacing
+    read -p "Press Enter to return to the menu..."
+}
+
+function format_kib_to_human() {
+    local kib=$1
+    if ! [[ "$kib" =~ ^[0-9]+$ ]] || [ -z "$kib" ]; then
+        kib=0
+    fi
+
+    # Using awk for floating point math
+    if [ "$kib" -lt 1048576 ]; then
+        awk -v val="$kib" 'BEGIN { printf "%.2f MiB", val / 1024 }'
+    else
+        awk -v val="$kib" 'BEGIN { printf "%.2f GiB", val / 1048576 }'
+    fi
+}
+
+function get_main_interface() {
+    # Find the interface with the most total traffic to be the most reliable source
+    vnstat --json i | jq -r '
+        .interfaces[]
+        | {name: .name, total_rx: .traffic.total.rx, total_tx: .traffic.total.tx}
+        | select(.total_rx != null and .total_tx != null)
+        | .name
+    ' | head -n 1
+}
+
+function _draw_info_panel() {
+    # --- Fetch Data ---
+    local os_info isp_info ip_info host_info bw_today bw_month
+
+    os_info=$( (hostnamectl 2>/dev/null | grep "Operating System" | cut -d: -f2 | sed 's/^[ \t]*//') || echo "N/A" )
+    os_info=${os_info:-"N/A"}
+
+    local ip_data
+    ip_data=$(curl -s ipinfo.io)
+    ip_info=$(echo "$ip_data" | jq -r '.ip // "N/A"')
+    isp_info=$(echo "$ip_data" | jq -r '.org // "N/A"')
+    ip_info=${ip_info:-"N/A"}
+    isp_info=${isp_info:-"N/A"}
+
+    local CERT_CN
+    CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p' 2>/dev/null || echo "")
+    if [ "$CERT_CN" == "zivpn" ] || [ -z "$CERT_CN" ]; then
+        host_info=$ip_info
+    else
+        host_info=$CERT_CN
+    fi
+    host_info=${host_info:-"N/A"}
+
+    if command -v vnstat &> /dev/null && vnstat --version &> /dev/null; then
+        local iface
+        iface=$(get_main_interface)
+        local current_year current_month current_day
+        current_year=$(date +%Y)
+        current_month=$(date +%m | sed 's/^0*//')
+        current_day=$(date +%d | sed 's/^0*//')
+
+        # Daily
+        local daily_json
+        daily_json=$(vnstat --json d)
+        local today_data
+        today_data=$(echo "$daily_json" | jq --arg iface "$iface" --argjson year "$current_year" --argjson month "$current_month" --argjson day "$current_day" '(.interfaces[] | select(.name == $iface) | .traffic.days // [])[] | select(.date.year == $year and .date.month == $month and .date.day == $day)')
+        local today_rx_kib=0
+        local today_tx_kib=0
+        if [ -n "$today_data" ]; then
+            today_rx_kib=$(echo "$today_data" | jq '.rx // 0')
+            today_tx_kib=$(echo "$today_data" | jq '.tx // 0')
+        fi
+        local today_total_kib=$((today_rx_kib + today_tx_kib))
+        bw_today=$(format_kib_to_human "$today_total_kib")
+
+        # Monthly
+        local monthly_json
+        monthly_json=$(vnstat --json m)
+        local month_data
+        month_data=$(echo "$monthly_json" | jq --arg iface "$iface" --argjson year "$current_year" --argjson month "$current_month" '(.interfaces[] | select(.name == $iface) | .traffic.months // [])[] | select(.date.year == $year and .date.month == $month)')
+        local month_rx_kib=0
+        local month_tx_kib=0
+        if [ -n "$month_data" ]; then
+            month_rx_kib=$(echo "$month_data" | jq '.rx // 0')
+            month_tx_kib=$(echo "$month_data" | jq '.tx // 0')
+        fi
+        local month_total_kib=$((month_rx_kib + month_tx_kib))
+        bw_month=$(format_kib_to_human "$month_total_kib")
+
+    else
+        bw_today="N/A"
+        bw_month="N/A"
+    fi
+
+    # --- Print Panel ---
+    printf "  ${RED}%-7s${BOLD_WHITE}%-18s ${RED}%-6s${BOLD_WHITE}%-19s${NC}\n" "OS:" "${os_info}" "ISP:" "${isp_info}"
+    printf "  ${RED}%-7s${BOLD_WHITE}%-18s ${RED}%-6s${BOLD_WHITE}%-19s${NC}\n" "IP:" "${ip_info}" "Host:" "${host_info}"
+    printf "  ${RED}%-7s${BOLD_WHITE}%-18s ${RED}%-6s${BOLD_WHITE}%-19s${NC}\n" "Today:" "${bw_today}" "Month:" "${bw_month}"
+}
+
+function _draw_service_status() {
+    local status_text status_color status_output
+    local service_status
+    service_status=$(systemctl is-active zivpn.service 2>/dev/null)
+
+    if [ "$service_status" = "active" ]; then
+        status_text="Running"
+        status_color="${GREEN}"
+    elif [ "$service_status" = "inactive" ]; then
+        status_text="Stopped"
+        status_color="${RED}"
+    elif [ "$service_status" = "failed" ]; then
+        status_text="Error"
+        status_color="${RED}"
+    else
+        status_text="Unknown"
+        status_color="${RED}"
+    fi
+
+    status_output="${CYAN}Service: ${status_color}${status_text}${NC}"
+
+    # Center the text
+    local menu_width=55  # Total width of the menu box including borders
+    local text_len_visible
+    text_len_visible=$(echo -e "$status_output" | sed 's/\x1b\[[0-9;]*m//g' | wc -c)
+    text_len_visible=$((text_len_visible - 1))
+
+    local padding_total=$((menu_width - text_len_visible))
+    local padding_left=$((padding_total / 2))
+    local padding_right=$((padding_total - padding_left))
+
+    echo -e "${YELLOW}╠════════════════════════════════════════════════════╣${NC}"
+    echo -e "$(printf '%*s' $padding_left)${status_output}$(printf '%*s' $padding_right)"
+    echo -e "${YELLOW}╠════════════════════════════════════════════════════╣${NC}"
 }
 
 function setup_auto_backup() {
@@ -296,6 +441,8 @@ function show_menu() {
     figlet "UDP ZIVPN" | lolcat
     
     echo -e "${YELLOW}╔══════════════════// ${RED}KEDAI SSH${YELLOW} //═══════════════════╗${NC}"
+    _draw_info_panel
+    _draw_service_status
     echo -e "${YELLOW}║                                                    ║${NC}"
     echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Create Account                                ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Renew Account                                 ${YELLOW}║${NC}"
@@ -336,9 +483,26 @@ function run_setup() {
     # --- Setting up Advanced Management ---
     echo "--- Setting up Advanced Management ---"
 
-    if ! command -v jq &> /dev/null || ! command -v curl &> /dev/null || ! command -v zip &> /dev/null || ! command -v figlet &> /dev/null || ! command -v lolcat &> /dev/null; then
-        echo "Installing dependencies (jq, curl, zip, figlet, lolcat)..."
-        apt-get update && apt-get install -y jq curl zip figlet lolcat
+    if ! command -v jq &> /dev/null || ! command -v curl &> /dev/null || ! command -v zip &> /dev/null || ! command -v figlet &> /dev/null || ! command -v lolcat &> /dev/null || ! command -v vnstat &> /dev/null; then
+        echo "Installing dependencies (jq, curl, zip, figlet, lolcat, vnstat)..."
+        apt-get update && apt-get install -y jq curl zip figlet lolcat vnstat
+    fi
+
+    # --- vnstat setup ---
+    echo "Configuring vnstat for bandwidth monitoring..."
+    local net_interface
+    net_interface=$(ip -o -4 route show to default | awk '{print $5}' | head -n 1)
+    if [ -n "$net_interface" ]; then
+        echo "Detected network interface: $net_interface"
+        # Wait for the service to be available after installation
+        sleep 2
+        systemctl stop vnstat
+        vnstat -u -i "$net_interface" --force
+        systemctl enable vnstat
+        systemctl start vnstat
+        echo "vnstat setup complete for interface $net_interface."
+    else
+        echo "Warning: Could not automatically detect network interface for vnstat."
     fi
     
     # Download helper script from repository
@@ -433,7 +597,6 @@ function main() {
 
     while true; do
         show_menu
-        read -p "Press Enter to return to the menu..."
     done
 }
 
