@@ -408,7 +408,7 @@ function _draw_service_status() {
 
     if [ "$service_status" = "active" ]; then
         status_text="Running"
-        status_color="${LIGHT_GREEN}"
+        status_color="${GREEN}"
     elif [ "$service_status" = "inactive" ]; then
         status_text="Stopped"
         status_color="${RED}"
@@ -488,16 +488,18 @@ function show_backup_menu() {
     echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Backup Data                                 ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Restore Data                                ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}3)${NC} ${BOLD_WHITE}Auto Backup                                 ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}4)${NC} ${BOLD_WHITE}Atur Ulang Notifikasi Telegram              ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Back to Main Menu                           ${YELLOW}║${NC}"
     echo -e "${YELLOW}║                                                  ║${NC}"
     echo -e "${YELLOW}╚══════════════════════════════════════════════════╝${NC}"
     
-    read -p "Enter your choice [0-3]: " choice
+    read -p "Enter your choice [0-4]: " choice
     
     case $choice in
         1) /usr/local/bin/zivpn_helper.sh backup ;;
         2) /usr/local/bin/zivpn_helper.sh restore ;;
         3) setup_auto_backup ;;
+        4) /usr/local/bin/zivpn_helper.sh setup-telegram ;;
         0) return ;;
         *) echo "Invalid option." ;;
     esac
@@ -511,8 +513,9 @@ function show_expired_message_and_exit() {
     echo -e "${BOLD_WHITE}Akses ke layanan ZIVPN di server ini telah dihentikan."
     echo -e "Segala aktivitas VPN tidak akan berfungsi lagi.\n"
     echo -e "Untuk memperpanjang lisensi dan mengaktifkan kembali layanan,"
-    echo -e "silakan hubungi admin https://wa.me/6287777694482.\n"
-    echo -e "${LIGHT_GREEN}Setelah diperpanjang, layanan akan aktif kembali secara otomatis.${NC}\n"
+    echo -e "silakan hubungi administrator Anda.\n"
+    echo -e "${CYAN}Sistem akan memeriksa pembaruan lisensi secara otomatis setiap 5 menit.${NC}"
+    echo -e "${CYAN}Setelah diperpanjang, layanan akan aktif kembali secara otomatis.${NC}\n"
     exit 0
 }
 
@@ -771,6 +774,16 @@ EOF
     (crontab -l 2>/dev/null | grep -v "# zivpn-license-check") | crontab -
     (crontab -l 2>/dev/null; echo "$CRON_JOB_LICENSE") | crontab -
 
+    # --- Telegram Notification Setup ---
+    if [ ! -f "/etc/zivpn/telegram.conf" ]; then
+        echo ""
+        read -p "Apakah Anda ingin mengatur notifikasi Telegram untuk status lisensi? (y/n): " confirm
+        if [[ "$confirm" == [yY] || "$confirm" == [yY][eE][sS] ]]; then
+            /usr/local/bin/zivpn_helper.sh setup-telegram
+        else
+            echo "Anda dapat mengaturnya nanti melalui menu Backup/Restore."
+        fi
+    fi
 
     restart_zivpn
 
