@@ -292,18 +292,20 @@ function _draw_info_panel() {
         iface=$(get_main_interface)
         local current_year current_month current_day
         current_year=$(date +%Y)
-        current_month=$(date +%-m)
-        current_day=$(date +%-d)
+        current_month=$(date +%m | sed 's/^0*//')
+        current_day=$(date +%d | sed 's/^0*//')
 
         # Daily
         local daily_json
         daily_json=$(vnstat --json d)
         local today_data
         today_data=$(echo "$daily_json" | jq --arg iface "$iface" --argjson year "$current_year" --argjson month "$current_month" --argjson day "$current_day" '(.interfaces[] | select(.name == $iface) | .traffic.days // [])[] | select(.date.year == $year and .date.month == $month and .date.day == $day)')
-        local today_rx_kib
-        today_rx_kib=$(echo "$today_data" | jq '.rx // 0')
-        local today_tx_kib
-        today_tx_kib=$(echo "$today_data" | jq '.tx // 0')
+        local today_rx_kib=0
+        local today_tx_kib=0
+        if [ -n "$today_data" ]; then
+            today_rx_kib=$(echo "$today_data" | jq '.rx // 0')
+            today_tx_kib=$(echo "$today_data" | jq '.tx // 0')
+        fi
         local today_total_kib=$((today_rx_kib + today_tx_kib))
         bw_today=$(format_kib_to_human "$today_total_kib")
 
@@ -312,10 +314,12 @@ function _draw_info_panel() {
         monthly_json=$(vnstat --json m)
         local month_data
         month_data=$(echo "$monthly_json" | jq --arg iface "$iface" --argjson year "$current_year" --argjson month "$current_month" '(.interfaces[] | select(.name == $iface) | .traffic.months // [])[] | select(.date.year == $year and .date.month == $month)')
-        local month_rx_kib
-        month_rx_kib=$(echo "$month_data" | jq '.rx // 0')
-        local month_tx_kib
-        month_tx_kib=$(echo "$month_data" | jq '.tx // 0')
+        local month_rx_kib=0
+        local month_tx_kib=0
+        if [ -n "$month_data" ]; then
+            month_rx_kib=$(echo "$month_data" | jq '.rx // 0')
+            month_tx_kib=$(echo "$month_data" | jq '.tx // 0')
+        fi
         local month_total_kib=$((month_rx_kib + month_tx_kib))
         bw_month=$(format_kib_to_human "$month_total_kib")
 
