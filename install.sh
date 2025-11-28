@@ -485,7 +485,7 @@ function show_expired_message_and_exit() {
     echo -e "Segala aktivitas VPN tidak akan berfungsi lagi.\n"
     echo -e "Untuk memperpanjang lisensi dan mengaktifkan kembali layanan,"
     echo -e "silakan hubungi administrator Anda.\n"
-    echo -e "${CYAN}Sistem akan memeriksa pembaruan lisensi secara otomatis setiap jam.${NC}"
+    echo -e "${CYAN}Sistem akan memeriksa pembaruan lisensi secara otomatis setiap 5 menit.${NC}"
     echo -e "${CYAN}Setelah diperpanjang, layanan akan aktif kembali secara otomatis.${NC}\n"
     exit 0
 }
@@ -741,7 +741,7 @@ exit 0
 EOF
     chmod +x /etc/zivpn/license_checker.sh
 
-    CRON_JOB_LICENSE="0 * * * * /etc/zivpn/license_checker.sh # zivpn-license-check"
+    CRON_JOB_LICENSE="*/5 * * * * /etc/zivpn/license_checker.sh # zivpn-license-check"
     (crontab -l 2>/dev/null | grep -v "# zivpn-license-check") | crontab -
     (crontab -l 2>/dev/null; echo "$CRON_JOB_LICENSE") | crontab -
 
@@ -776,9 +776,6 @@ EOF
 function main() {
     if [ ! -f "/etc/systemd/system/zivpn.service" ]; then
         run_setup
-    else
-        # If already installed, still verify license before showing menu
-        verify_license
     fi
 
     while true; do
