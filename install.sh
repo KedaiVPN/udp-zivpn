@@ -408,7 +408,7 @@ function _draw_service_status() {
 
     if [ "$service_status" = "active" ]; then
         status_text="Running"
-        status_color="${GREEN}"
+        status_color="${LIGHT_GREEN}"
     elif [ "$service_status" = "inactive" ]; then
         status_text="Stopped"
         status_color="${RED}"
@@ -510,12 +510,11 @@ function show_expired_message_and_exit() {
     echo -e "\n${RED}=====================================================${NC}"
     echo -e "${RED}           LISENSI ANDA TELAH KEDALUWARSA!           ${NC}"
     echo -e "${RED}=====================================================${NC}\n"
-    echo -e "${BOLD_WHITE}Akses ke layanan ZIVPN di server ini telah dihentikan."
+    echo -e "${BOLD_WHITE}Akses ke layanan ZIVPN di server anda telah dihentikan."
     echo -e "Segala aktivitas VPN tidak akan berfungsi lagi.\n"
     echo -e "Untuk memperpanjang lisensi dan mengaktifkan kembali layanan,"
-    echo -e "silakan hubungi administrator Anda.\n"
-    echo -e "${CYAN}Sistem akan memeriksa pembaruan lisensi secara otomatis setiap 5 menit.${NC}"
-    echo -e "${CYAN}Setelah diperpanjang, layanan akan aktif kembali secara otomatis.${NC}\n"
+    echo -e "silakan hubungi admin https://wa.me/6287777694482\n"
+    echo -e "${LIGHT_GREEN}Setelah diperpanjang, layanan akan aktif kembali secara otomatis.${NC}\n"
     exit 0
 }
 
