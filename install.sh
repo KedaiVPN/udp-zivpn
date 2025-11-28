@@ -125,6 +125,7 @@ function create_manual_account() {
     echo "♨ᵗᵉʳⁱᵐᵃᵏᵃˢⁱʰ ᵗᵉˡᵃʰ ᵐᵉⁿᵍᵍᵘⁿᵃᵏᵃⁿ ˡᵃʸᵃⁿᵃⁿ ᵏᵃᵐⁱ♨"
     
     restart_zivpn
+    read -p "Tekan Enter untuk kembali ke menu..."
 }
 
 function create_trial_account() {
@@ -166,6 +167,7 @@ function create_trial_account() {
     echo "♨ᵗᵉʳⁱᵐᵃᵏᵃˢⁱʰ ᵗᵉˡᵃʰ ᵐᵉⁿᵍᵍᵘⁿᵃᵏᵃⁿ ˡᵃʸᵃⁿᵃⁿ ᵏᵃᵐⁱ♨"
     
     restart_zivpn
+    read -p "Tekan Enter untuk kembali ke menu..."
 }
 
 function renew_account() {
