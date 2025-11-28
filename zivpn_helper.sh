@@ -22,27 +22,37 @@ function send_telegram_message() {
     # URL Encode the message
     local encoded_message
     encoded_message=$(printf %s "$message" | jq -s -R -r @uri)
-    curl -s -o /dev/null "https://api.telegram.org/bot${API_KEY}/sendMessage?chat_id=${CHAT_ID}&text=${encoded_message}"
+    curl -s -o /dev/null "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${encoded_message}"
 }
 
 # --- Core Functions ---
+function setup_telegram() {
+    echo "--- Konfigurasi Notifikasi Telegram ---"
+    read -p "Masukkan Bot API Key Anda: " api_key
+    read -p "Masukkan ID Chat Telegram Anda (dapatkan dari @userinfobot): " chat_id
+
+    if [ -z "$api_key" ] || [ -z "$chat_id" ]; then
+        echo "API Key dan ID Chat tidak boleh kosong. Pengaturan dibatalkan."
+        return 1
+    fi
+
+    echo "TELEGRAM_BOT_TOKEN=${api_key}" > "$TELEGRAM_CONF"
+    echo "TELEGRAM_CHAT_ID=${chat_id}" >> "$TELEGRAM_CONF"
+    chmod 600 "$TELEGRAM_CONF"
+    echo "Konfigurasi berhasil disimpan di $TELEGRAM_CONF"
+    return 0
+}
+
 function handle_backup() {
-    echo "--- Starting Backup Process ---"
+    echo "--- Memulai Proses Backup ---"
 
     if [ ! -f "$TELEGRAM_CONF" ]; then
-        echo "Telegram credentials not found. Please configure them first."
-        read -p "Enter your Bot API Key: " api_key
-        read -p "Enter your Telegram Chat ID (get it from @userinfobot): " chat_id
-
-        if [ -z "$api_key" ] || [ -z "$chat_id" ]; then
-            echo "API Key and Chat ID cannot be empty. Aborting."
+        echo "Kredensial Telegram tidak ditemukan."
+        setup_telegram
+        if [ $? -ne 0 ]; then
+            echo "Proses backup dibatalkan karena konfigurasi Telegram gagal."
             exit 1
         fi
-
-        echo "API_KEY=${api_key}" > "$TELEGRAM_CONF"
-        echo "CHAT_ID=${chat_id}" >> "$TELEGRAM_CONF"
-        chmod 600 "$TELEGRAM_CONF"
-        echo "Credentials saved to $TELEGRAM_CONF"
     fi
 
     # shellcheck source=/etc/zivpn/telegram.conf
@@ -61,7 +71,7 @@ function handle_backup() {
 
     echo "Sending backup to Telegram..."
     local response
-    response=$(curl -s -F "chat_id=${CHAT_ID}" -F "document=@${temp_backup_path}" "https://api.telegram.org/bot${API_KEY}/sendDocument")
+    response=$(curl -s -F "chat_id=${TELEGRAM_CHAT_ID}" -F "document=@${temp_backup_path}" "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument")
 
     local file_id
     file_id=$(echo "$response" | jq -r '.result.document.file_id')
@@ -123,7 +133,7 @@ function handle_restore() {
 
     echo "Fetching file information from Telegram..."
     local response
-    response=$(curl -s "https://api.telegram.org/bot${API_KEY}/getFile?file_id=${file_id}")
+    response=$(curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile?file_id=${file_id}")
     
     local file_path
     file_path=$(echo "$response" | jq -r '.result.file_path')
@@ -134,7 +144,7 @@ function handle_restore() {
         exit 1
     fi
 
-    local download_url="https://api.telegram.org/file/bot${API_KEY}/${file_path}"
+    local download_url="https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${file_path}"
     local temp_restore_path="/tmp/restore_$(basename "$file_path")"
 
     echo "Downloading backup file..."
@@ -169,8 +179,11 @@ case "$1" in
     restore)
         handle_restore
         ;;
+    setup-telegram)
+        setup_telegram
+        ;;
     *)
-        echo "Usage: $0 {backup|restore}"
+        echo "Usage: $0 {backup|restore|setup-telegram}"
         exit 1
         ;;
 esac
