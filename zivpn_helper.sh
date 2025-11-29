@@ -162,7 +162,12 @@ function handle_renewed_notification() {
     local ip="$2"
     local client="$3"
     local isp="$4"
-    local remaining_days="$5"
+    local expiry_timestamp="$5"
+
+    local current_timestamp
+    current_timestamp=$(date +%s)
+    local remaining_seconds=$((expiry_timestamp - current_timestamp))
+    local remaining_days=$((remaining_seconds / 86400))
 
     local message
     message=$(cat <<EOF
@@ -265,7 +270,7 @@ case "$1" in
         ;;
     renewed-notification)
         if [ $# -ne 6 ]; then
-            echo "Usage: $0 renewed-notification <host> <ip> <client> <isp> <remaining_days>"
+            echo "Usage: $0 renewed-notification <host> <ip> <client> <isp> <expiry_timestamp>"
             exit 1
         fi
         handle_renewed_notification "$2" "$3" "$4" "$5" "$6"
