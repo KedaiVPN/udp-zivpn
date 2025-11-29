@@ -1044,22 +1044,22 @@ const executeZivpnManager = (command, args, res) => {
     });
 };
 
-app.post('/create/zivpn', (req, res) => {
+app.all('/create/zivpn', (req, res) => {
     const { password, exp } = req.query;
     if (!password || !exp) return res.status(400).json({ status: 'error', message: 'Parameters password and exp are required.' });
     executeZivpnManager('create_account', [password, exp], res);
 });
-app.post('/delete/zivpn', (req, res) => {
+app.all('/delete/zivpn', (req, res) => {
     const { password } = req.query;
     if (!password) return res.status(400).json({ status: 'error', message: 'Parameter password is required.' });
     executeZivpnManager('delete_account', [password], res);
 });
-app.post('/renew/zivpn', (req, res) => {
+app.all('/renew/zivpn', (req, res) => {
     const { password, exp } = req.query;
     if (!password || !exp) return res.status(400).json({ status: 'error', message: 'Parameters password and exp are required.' });
     executeZivpnManager('renew_account', [password, exp], res);
 });
-app.post('/trial/zivpn', (req, res) => {
+app.all('/trial/zivpn', (req, res) => {
     const { exp } = req.query;
     if (!exp) return res.status(400).json({ status: 'error', message: 'Parameter exp is required.' });
     executeZivpnManager('trial_account', [exp], res);
@@ -1097,6 +1097,10 @@ EOF
     initial_api_key=$(LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 6)
     echo "$initial_api_key" > /etc/zivpn/api_auth.key
     chmod 600 /etc/zivpn/api_auth.key
+    
+    # 6. Open firewall port
+    echo "Opening firewall port 5888 for API..."
+    iptables -I INPUT -p tcp --dport 5888 -j ACCEPT
     
     echo "--- API Setup Complete ---"
 
