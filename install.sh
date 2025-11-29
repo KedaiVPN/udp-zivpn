@@ -76,6 +76,46 @@ function restart_zivpn() {
     echo "Service restarted."
 }
 
+# --- Internal Logic Functions (for API calls) ---
+function _create_account_logic() {
+    local password="$1"
+    local days="$2"
+    local db_file="/etc/zivpn/users.db"
+
+    if [ -z "$password" ] || [ -z "$days" ]; then
+        echo "Error: Password and days are required."
+        return 1
+    fi
+    
+    if ! [[ "$days" =~ ^[0-9]+$ ]]; then
+        echo "Error: Invalid number of days."
+        return 1
+    fi
+
+    if grep -q "^${password}:" "$db_file"; then
+        echo "Error: Password '${password}' already exists."
+        return 1
+    fi
+
+    local expiry_date
+    expiry_date=$(date -d "+$days days" +%s)
+    echo "${password}:${expiry_date}" >> "$db_file"
+    
+    # Use a temporary file for atomic write
+    jq --arg pass "$password" '.auth.config += [$pass]' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
+    
+    if [ $? -eq 0 ]; then
+        echo "Success: Account '${password}' created, expires in ${days} days."
+        restart_zivpn
+        return 0
+    else
+        # Rollback the change in users.db if config update fails
+        sed -i "/^${password}:/d" "$db_file"
+        echo "Error: Failed to update config.json."
+        return 1
+    fi
+}
+
 # --- Core Logic Functions ---
 function create_manual_account() {
     echo "--- Create New Zivpn Account ---"
@@ -91,41 +131,108 @@ function create_manual_account() {
         return
     fi
 
+    # Call the logic function and capture its output
+    local result
+    result=$(_create_account_logic "$password" "$days")
+    
+    # Display logic remains here for interactive mode if successful
+    if [[ "$result" == "Success"* ]]; then
+        local db_file="/etc/zivpn/users.db"
+        local user_line
+        user_line=$(grep "^${password}:" "$db_file")
+        if [ -n "$user_line" ]; then
+            local expiry_date
+            expiry_date=$(echo "$user_line" | cut -d: -f2)
+
+            local CERT_CN
+            CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p')
+            local HOST
+            if [ "$CERT_CN" == "zivpn" ]; then
+                HOST=$(curl -s ifconfig.me)
+            else
+                HOST=$CERT_CN
+            fi
+
+            local EXPIRE_FORMATTED
+            EXPIRE_FORMATTED=$(date -d "@$expiry_date" +"%d %B %Y")
+            
+            clear
+            echo "🔹Informasi Akun zivpn Anda🔹"
+            echo "┌─────────────────────"
+            echo "│ Host: $HOST"
+            echo "│ Pass: $password"
+            echo "│ Expire: $EXPIRE_FORMATTED"
+            echo "└─────────────────────"
+            echo "♨ᵗᵉʳⁱᵐᵃᵏᵃˢⁱʰ ᵗᵉˡᵃʰ ᵐᵉⁿᵍᵍᵘⁿᵃᵏᵃⁿ ˡᵃʸᵃⁿᵃⁿ ᵏᵃᵐⁱ♨"
+        fi
+    else
+        # If it failed, show the error message
+        echo "$result"
+    fi
+    
+    read -p "Tekan Enter untuk kembali ke menu..."
+}
+
+function _generate_api_key() {
+    clear
+    echo "--- Generate API Authentication Key ---"
+    
+    # Generate a 6-character alphanumeric key
+    local api_key
+    api_key=$(LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 6)
+    
+    local key_file="/etc/zivpn/api_auth.key"
+    
+    echo "$api_key" > "$key_file"
+    chmod 600 "$key_file"
+    
+    echo "New API authentication key has been generated and saved."
+    echo "Key: ${api_key}"
+    
+    echo "Sending API key to Telegram..."
+    # Get Server IP and Domain for the notification
+    local server_ip
+    server_ip=$(curl -s ifconfig.me)
+    local cert_cn
+    cert_cn=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p' 2>/dev/null || echo "")
+    local domain
+    if [ "$cert_cn" == "zivpn" ] || [ -z "$cert_cn" ]; then
+        domain=$server_ip
+    else
+        domain=$cert_cn
+    fi
+    
+    /usr/local/bin/zivpn_helper.sh api-key-notification "$api_key" "$server_ip" "$domain"
+    
+    read -p "Tekan Enter untuk kembali ke menu..."
+}
+
+function _create_trial_account_logic() {
+    local minutes="$1"
     local db_file="/etc/zivpn/users.db"
-    if grep -q "^${password}:" "$db_file"; then
-        echo "Password '${password}' already exists."
-        return
+
+    if ! [[ "$minutes" =~ ^[0-9]+$ ]]; then
+        echo "Error: Invalid number of minutes."
+        return 1
     fi
 
+    local password="trial$(shuf -i 10000-99999 -n 1)"
+
     local expiry_date
-    expiry_date=$(date -d "+$days days" +%s)
+    expiry_date=$(date -d "+$minutes minutes" +%s)
     echo "${password}:${expiry_date}" >> "$db_file"
     
     jq --arg pass "$password" '.auth.config += [$pass]' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
     
-    local CERT_CN
-    CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p')
-    local HOST
-    if [ "$CERT_CN" == "zivpn" ]; then
-        HOST=$(curl -s ifconfig.me)
+    if [ $? -eq 0 ]; then
+        echo "Success: Trial account '${password}' created, expires in ${minutes} minutes."
+        restart_zivpn
+        return 0
     else
-        HOST=$CERT_CN
+        sed -i "/^${password}:/d" "$db_file"
+        echo "Error: Failed to update config.json."
+        return 1
     fi
-
-    local EXPIRE_FORMATTED
-    EXPIRE_FORMATTED=$(date -d "@$expiry_date" +"%d %B %Y")
-    
-    clear
-    echo "🔹Informasi Akun zivpn Anda🔹"
-    echo "┌─────────────────────"
-    echo "│ Host: $HOST"
-    echo "│ Pass: $password"
-    echo "│ Expire: $EXPIRE_FORMATTED"
-    echo "└─────────────────────"
-    echo "♨ᵗᵉʳⁱᵐᵃᵏᵃˢⁱʰ ᵗᵉˡᵃʰ ᵐᵉⁿᵍᵍᵘⁿᵃᵏᵃⁿ ˡᵃʸᵃⁿᵃⁿ ᵏᵃᵐⁱ♨"
-    
-    restart_zivpn
-    read -p "Tekan Enter untuk kembali ke menu..."
 }
 
 function create_trial_account() {
@@ -136,38 +243,86 @@ function create_trial_account() {
         return
     fi
 
-    local password="trial$(shuf -i 10000-99999 -n 1)"
+    local result
+    result=$(_create_trial_account_logic "$minutes")
+    
+    if [[ "$result" == "Success"* ]]; then
+        # Extract password from the success message
+        local password
+        password=$(echo "$result" | sed -n "s/Success: Trial account '\([^']*\)'.*/\1/p")
+        
+        local db_file="/etc/zivpn/users.db"
+        local user_line
+        user_line=$(grep "^${password}:" "$db_file")
+        if [ -n "$user_line" ]; then
+            local expiry_date
+            expiry_date=$(echo "$user_line" | cut -d: -f2)
+
+            local CERT_CN
+            CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p')
+            local HOST
+            if [ "$CERT_CN" == "zivpn" ]; then
+                HOST=$(curl -s ifconfig.me)
+            else
+                HOST=$CERT_CN
+            fi
+
+            local EXPIRE_FORMATTED
+            EXPIRE_FORMATTED=$(date -d "@$expiry_date" +"%d %B %Y %H:%M:%S")
+            
+            clear
+            echo "🔹Informasi Akun zivpn Anda🔹"
+            echo "┌─────────────────────"
+            echo "│ Host: $HOST"
+            echo "│ Pass: $password"
+            echo "│ Expire: $EXPIRE_FORMATTED"
+            echo "└─────────────────────"
+            echo "♨ᵗᵉʳⁱᵐᵃᵏᵃˢⁱʰ ᵗᵉˡᵃʰ ᵐᵉⁿᵍᵍᵘⁿᵃᵏᵃⁿ ˡᵃʸᵃⁿᵃⁿ ᵏᵃᵐⁱ♨"
+        fi
+    else
+        echo "$result"
+    fi
+    
+    read -p "Tekan Enter untuk kembali ke menu..."
+}
+
+function _renew_account_logic() {
+    local password="$1"
+    local days="$2"
     local db_file="/etc/zivpn/users.db"
 
-    local expiry_date
-    expiry_date=$(date -d "+$minutes minutes" +%s)
-    echo "${password}:${expiry_date}" >> "$db_file"
+    if [ -z "$password" ] || [ -z "$days" ]; then
+        echo "Error: Password and days are required."
+        return 1
+    fi
     
-    jq --arg pass "$password" '.auth.config += [$pass]' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
-    
-    local CERT_CN
-    CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p')
-    local HOST
-    if [ "$CERT_CN" == "zivpn" ]; then
-        HOST=$(curl -s ifconfig.me)
-    else
-        HOST=$CERT_CN
+    if ! [[ "$days" =~ ^[1-9][0-9]*$ ]]; then
+        echo "Error: Invalid number of days."
+        return 1
     fi
 
-    local EXPIRE_FORMATTED
-    EXPIRE_FORMATTED=$(date -d "@$expiry_date" +"%d %B %Y %H:%M:%S")
+    local user_line
+    user_line=$(grep "^${password}:" "$db_file")
+
+    if [ -z "$user_line" ]; then
+        echo "Error: Account '${password}' not found."
+        return 1
+    fi
+
+    local current_expiry_date
+    current_expiry_date=$(echo "$user_line" | cut -d: -f2)
+
+    if ! [[ "$current_expiry_date" =~ ^[0-9]+$ ]]; then
+        echo "Error: Corrupted database entry for user '$password'."
+        return 1
+    fi
     
-    clear
-    echo "🔹Informasi Akun zivpn Anda🔹"
-    echo "┌─────────────────────"
-    echo "│ Host: $HOST"
-    echo "│ Pass: $password"
-    echo "│ Expire: $EXPIRE_FORMATTED"
-    echo "└─────────────────────"
-    echo "♨ᵗᵉʳⁱᵐᵃᵏᵃˢⁱʰ ᵗᵉˡᵃʰ ᵐᵉⁿᵍᵍᵘⁿᵃᵏᵃⁿ ˡᵃʸᵃⁿᵃⁿ ᵏᵃᵐⁱ♨"
+    local seconds_to_add=$((days * 86400))
+    local new_expiry_date=$((current_expiry_date + seconds_to_add))
     
-    restart_zivpn
-    read -p "Tekan Enter untuk kembali ke menu..."
+    sed -i "s/^${password}:.*/${password}:${new_expiry_date}/" "$db_file"
+    echo "Success: Account '${password}' has been renewed for ${days} days."
+    return 0
 }
 
 function renew_account() {
@@ -187,31 +342,59 @@ function renew_account() {
         return
     fi
 
+    local result
+    result=$(_renew_account_logic "$password" "$days")
+    
+    if [[ "$result" == "Success"* ]]; then
+        local db_file="/etc/zivpn/users.db"
+        local user_line
+        user_line=$(grep "^${password}:" "$db_file")
+        local new_expiry_date
+        new_expiry_date=$(echo "$user_line" | cut -d: -f2)
+        local new_expiry_formatted
+        new_expiry_formatted=$(date -d "@$new_expiry_date" +"%d %B %Y")
+        echo "Account '${password}' has been renewed. New expiry date: ${new_expiry_formatted}."
+    else
+        echo "$result"
+    fi
+    read -p "Tekan Enter untuk kembali ke menu..."
+}
+
+function _delete_account_logic() {
+    local password="$1"
     local db_file="/etc/zivpn/users.db"
-    local user_line
-    user_line=$(grep "^${password}:" "$db_file")
+    local config_file="/etc/zivpn/config.json"
+    local tmp_config_file="${config_file}.tmp"
 
-    if [ -z "$user_line" ]; then
-        echo "Account '${password}' not found or has expired."
-        return
+    if [ -z "$password" ]; then
+        echo "Error: Password is required."
+        return 1
     fi
 
-    local current_expiry_date
-    current_expiry_date=$(echo "$user_line" | cut -d: -f2)
-
-    if ! [[ "$current_expiry_date" =~ ^[0-9]+$ ]]; then
-        echo "Error: Corrupted database entry for user '$password'. Cannot renew."
-        return
+    if [ ! -f "$db_file" ] || ! grep -q "^${password}:" "$db_file"; then
+        echo "Error: Password '${password}' not found."
+        return 1
     fi
-    
-    local seconds_to_add=$((days * 86400))
-    local new_expiry_date=$((current_expiry_date + seconds_to_add))
-    
-    sed -i "s/^${password}:.*/${password}:${new_expiry_date}/" "$db_file"
 
-    local new_expiry_formatted
-    new_expiry_formatted=$(date -d "@$new_expiry_date" +"%d %B %Y")
-    echo "Account '${password}' has been renewed. New expiry date: ${new_expiry_formatted}."
+    # Step 1: Try to update the config file first to a temporary location
+    jq --arg pass "$password" 'del(.auth.config[] | select(. == $pass))' "$config_file" > "$tmp_config_file"
+    
+    if [ $? -eq 0 ]; then
+        # Step 2: If config update is successful, remove user from db
+        sed -i "/^${password}:/d" "$db_file"
+        
+        # Step 3: Atomically replace the old config with the new one
+        mv "$tmp_config_file" "$config_file"
+        
+        echo "Success: Account '${password}' deleted."
+        restart_zivpn
+        return 0
+    else
+        # If config update fails, do not touch the db file and report error
+        rm -f "$tmp_config_file" # Clean up temp file
+        echo "Error: Failed to update config.json. No changes were made."
+        return 1
+    fi
 }
 
 function delete_account() {
@@ -225,23 +408,11 @@ function delete_account() {
         return
     fi
 
-    local db_file="/etc/zivpn/users.db"
-    if [ ! -f "$db_file" ]; then
-        echo "User database not found."
-        return
-    fi
-
-    if ! grep -q "^${password}:" "$db_file"; then
-        echo "Password '${password}' not found."
-        return
-    fi
-
-    sed -i "/^${password}:/d" "$db_file"
-    echo "User '${password}' removed from database."
-
-    jq --arg pass "$password" 'del(.auth.config[] | select(. == $pass))' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
-    echo "Configuration updated."
-    restart_zivpn
+    local result
+    result=$(_delete_account_logic "$password")
+    
+    echo "$result" # Display the result from the logic function
+    read -p "Tekan Enter untuk kembali ke menu..."
 }
 
 function change_domain() {
@@ -408,7 +579,7 @@ function _draw_service_status() {
 
     if [ "$service_status" = "active" ]; then
         status_text="Running"
-        status_color="${GREEN}"
+        status_color="${LIGHT_GREEN}"
     elif [ "$service_status" = "inactive" ]; then
         status_text="Stopped"
         status_color="${RED}"
@@ -505,53 +676,16 @@ function show_backup_menu() {
     esac
 }
 
-function generate_api_auth_code() {
-    echo "--- Generating API Auth Code ---"
-    local auth_code
-    auth_code=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 6)
-    
-    echo "$auth_code" > /etc/zivpn/api.auth
-    chmod 600 /etc/zivpn/api.auth
-    
-    local ip_vps
-    ip_vps=$(curl -s ifconfig.me)
-    local domain_vps
-    domain_vps=$(hostname -f)
-
-    local message="🚀 API UDP ZIVPN 🚀
-   🔑 Auth Key: ${auth_code}
-   🌐 Server IP: ${ip_vps}
-   🌍 Domain: ${domain_vps}"
-
-    local TELEGRAM_CONF="/etc/zivpn/telegram.conf"
-    if [ -f "$TELEGRAM_CONF" ]; then
-        source "$TELEGRAM_CONF"
-        if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
-            local api_url="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
-            curl -s -X POST "$api_url" -d "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${message}" > /dev/null
-            echo "API Auth Code generated and sent to Telegram."
-        else
-            echo "Telegram credentials not found. Cannot send notification."
-        fi
-    else
-        echo "Telegram not configured. Cannot send notification."
-    fi
-    
-    echo "API Auth Code: ${auth_code}" # Also display it for manual copy
-    read -p "Press Enter to return to the menu..."
-}
-
 function show_expired_message_and_exit() {
     clear
     echo -e "\n${RED}=====================================================${NC}"
     echo -e "${RED}           LISENSI ANDA TELAH KEDALUWARSA!           ${NC}"
     echo -e "${RED}=====================================================${NC}\n"
-    echo -e "${BOLD_WHITE}Akses ke layanan ZIVPN di server ini telah dihentikan."
+    echo -e "${BOLD_WHITE}Akses ke layanan ZIVPN di server anda telah dihentikan."
     echo -e "Segala aktivitas VPN tidak akan berfungsi lagi.\n"
     echo -e "Untuk memperpanjang lisensi dan mengaktifkan kembali layanan,"
-    echo -e "silakan hubungi administrator Anda.\n"
-    echo -e "${CYAN}Sistem akan memeriksa pembaruan lisensi secara otomatis setiap 5 menit.${NC}"
-    echo -e "${CYAN}Setelah diperpanjang, layanan akan aktif kembali secara otomatis.${NC}\n"
+    echo -e "silakan hubungi admin https://wa.me/6287777694482 \n"
+    echo -e "${LIGHT_GREEN}Setelah diperpanjang, layanan akan aktif kembali secara otomatis.${NC}\n"
     exit 0
 }
 
@@ -573,7 +707,7 @@ function show_menu() {
     echo -e "${YELLOW}║   ${RED}4)${NC} ${BOLD_WHITE}Change Domain                                 ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}5)${NC} ${BOLD_WHITE}List Accounts                                 ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}6)${NC} ${BOLD_WHITE}Backup/Restore                                ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║   ${RED}7)${NC} ${BOLD_WHITE}Generate API Auth Code                        ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}7)${NC} ${BOLD_WHITE}Generate API Auth Key                         ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Exit                                          ${YELLOW}║${NC}"
     echo -e "${YELLOW}║                                                    ║${NC}"
     echo -e "${YELLOW}╚════════════════════════════════════════════════════╝${NC}"
@@ -587,7 +721,7 @@ function show_menu() {
         4) change_domain ;;
         5) list_accounts ;;
         6) show_backup_menu ;;
-        7) generate_api_auth_code ;;
+        7) _generate_api_key ;;
         0) exit 0 ;;
         *) echo "Invalid option. Please try again." ;;
     esac
@@ -610,11 +744,9 @@ function run_setup() {
     # --- Setting up Advanced Management ---
     echo "--- Setting up Advanced Management ---"
 
-    if ! command -v jq &> /dev/null || ! command -v curl &> /dev/null || ! command -v zip &> /dev/null || ! command -v figlet &> /dev/null || ! command -v lolcat &> /dev/null || ! command -v vnstat &> /dev/null || ! command -v node &> /dev/null || ! command -v pm2 &> /dev/null; then
-        echo "Installing dependencies (jq, curl, zip, figlet, lolcat, vnstat, nodejs, pm2)..."
-        apt-get update
-        apt-get install -y jq curl zip figlet lolcat vnstat nodejs npm
-        npm install -g pm2
+    if ! command -v jq &> /dev/null || ! command -v curl &> /dev/null || ! command -v zip &> /dev/null || ! command -v figlet &> /dev/null || ! command -v lolcat &> /dev/null || ! command -v vnstat &> /dev/null; then
+        echo "Installing dependencies (jq, curl, zip, figlet, lolcat, vnstat)..."
+        apt-get update && apt-get install -y jq curl zip figlet lolcat vnstat
     fi
 
     # --- vnstat setup ---
@@ -642,230 +774,6 @@ function run_setup() {
         exit 1
     fi
     chmod +x /usr/local/bin/zivpn_helper.sh
-
-    # Create API helper script
-    cat <<'EOF' > /usr/local/bin/zivpn_api_helper.sh
-#!/bin/bash
-# ZIVPN API Helper Script
-# Non-interactive script for managing users via API calls.
-
-# --- Configuration ---
-DB_FILE="/etc/zivpn/users.db"
-CONFIG_FILE="/etc/zivpn/config.json"
-
-# --- Utility Functions ---
-function restart_zivpn() {
-    systemctl restart zivpn.service
-}
-
-# --- Core Functions ---
-function create_account() {
-    local password="$1"
-    local days="$2"
-
-    if [ -z "$password" ] || [ -z "$days" ]; then
-        echo "Error: Password and days are required."
-        exit 1
-    fi
-
-    if grep -q "^${password}:" "$DB_FILE"; then
-        echo "Error: Password '${password}' already exists."
-        exit 1
-    fi
-
-    local expiry_timestamp
-    expiry_timestamp=$(date -d "+${days} days" +%s)
-    echo "${password}:${expiry_timestamp}" >> "$DB_FILE"
-    
-    jq --arg pass "${password}" '.auth.config += [$pass]' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
-    
-    restart_zivpn
-    echo "Success: Account '${password}' created, expires in ${days} days."
-}
-
-function delete_account() {
-    local password="$1"
-
-    if [ -z "$password" ]; then
-        echo "Error: Password is required."
-        exit 1
-    fi
-
-    if ! grep -q "^${password}:" "$DB_FILE"; then
-        echo "Error: Password '${password}' not found."
-        exit 1
-    fi
-
-    sed -i "/^${password}:/d" "$DB_FILE"
-    jq --arg pass "${password}" 'del(.auth.config[] | select(. == $pass))' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
-    
-    restart_zivpn
-    echo "Success: Account '${password}' deleted."
-}
-
-function renew_account() {
-    local password="$1"
-    local days="$2"
-
-    if [ -z "$password" ] || [ -z "$days" ]; then
-        echo "Error: Password and days are required."
-        exit 1
-    fi
-
-    local user_line
-    user_line=$(grep "^${password}:" "$DB_FILE")
-
-    if [ -z "$user_line" ]; then
-        echo "Error: Account '${password}' not found."
-        exit 1
-    fi
-
-    local current_expiry_timestamp
-    current_expiry_timestamp=$(echo "$user_line" | cut -d: -f2)
-
-    local seconds_to_add=$((${days} * 86400))
-    local new_expiry_timestamp=$((${current_expiry_timestamp} + ${seconds_to_add}))
-    
-    sed -i "s/^${password}:.*/${password}:${new_expiry_timestamp}/" "$DB_FILE"
-
-    restart_zivpn
-    echo "Success: Account '${password}' renewed for ${days} days."
-}
-
-# --- Main Logic ---
-case "$1" in
-    create)
-        create_account "$2" "$3"
-        ;;
-    delete)
-        delete_account "$2"
-        ;;
-    renew)
-        renew_account "$2" "$3"
-        ;;
-    *)
-        echo "Usage: $0 {create|delete|renew} [arguments...]"
-        exit 1
-        ;;
-esac
-EOF
-    chmod +x /usr/local/bin/zivpn_api_helper.sh
-
-    # Create Node.js API files
-    mkdir -p /etc/zivpn/api
-
-    cat <<'EOF' > /etc/zivpn/api/package.json
-{
-  "name": "zivpn-api",
-  "version": "1.0.0",
-  "description": "API for ZIVPN user management",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "dependencies": {
-    "express": "^4.17.1"
-  }
-}
-EOF
-
-    cat <<'EOF' > /etc/zivpn/api/index.js
-const express = require('express');
-const { execFile } = require('child_process');
-const fs = require('fs');
-
-const app = express();
-const port = 5888;
-const AUTH_FILE = '/etc/zivpn/api.auth';
-
-// Middleware to check auth code
-const authenticate = (req, res, next) => {
-    const authCode = req.query.auth;
-    if (!authCode) {
-        return res.status(401).json({ status: 'error', message: 'Auth code is missing.' });
-    }
-
-    fs.readFile(AUTH_FILE, 'utf8', (err, storedAuthCode) => {
-        if (err) {
-            console.error(`Error reading auth file: ${err}`);
-            return res.status(500).json({ status: 'error', message: 'Server error: Could not read auth file.' });
-        }
-        
-        if (authCode.trim() !== storedAuthCode.trim()) {
-            return res.status(403).json({ status: 'error', message: 'Invalid auth code.' });
-        }
-        
-        next();
-    });
-};
-
-app.use(authenticate);
-
-// Endpoint to create a user
-app.get('/api/create', (req, res) => {
-    const { password, exp } = req.query;
-
-    if (!password || !exp) {
-        return res.status(400).json({ status: 'error', message: 'Password and exp (days) are required.' });
-    }
-
-    const script = '/usr/local/bin/zivpn_api_helper.sh';
-    const args = ['create', password, exp];
-
-    execFile('sudo', [script, ...args], (error, stdout, stderr) => {
-        if (error) {
-            console.error(`exec error: ${error}`);
-            return res.status(500).json({ status: 'error', message: stderr.trim() });
-        }
-        res.json({ status: 'success', message: stdout.trim() });
-    });
-});
-
-// Endpoint to delete a user
-app.get('/api/delete', (req, res) => {
-    const { password } = req.query;
-
-    if (!password) {
-        return res.status(400).json({ status: 'error', message: 'Password is required.' });
-    }
-
-    const script = '/usr/local/bin/zivpn_api_helper.sh';
-    const args = ['delete', password];
-
-    execFile('sudo', [script, ...args], (error, stdout, stderr) => {
-        if (error) {
-            console.error(`exec error: ${error}`);
-            return res.status(500).json({ status: 'error', message: stderr.trim() });
-        }
-        res.json({ status: 'success', message: stdout.trim() });
-    });
-});
-
-// Endpoint to renew a user
-app.get('/api/renew', (req, res) => {
-    const { password, exp } = req.query;
-
-    if (!password || !exp) {
-        return res.status(400).json({ status: 'error', message: 'Password and exp (days) are required.' });
-    }
-
-    const script = '/usr/local/bin/zivpn_api_helper.sh';
-    const args = ['renew', password, exp];
-
-    execFile('sudo', [script, ...args], (error, stdout, stderr) => {
-        if (error) {
-            console.error(`exec error: ${error}`);
-            return res.status(500).json({ status: 'error', message: stderr.trim() });
-        }
-        res.json({ status: 'success', message: stdout.trim() });
-    });
-});
-
-
-app.listen(port, () => {
-    console.log(`ZIVPN API server listening at http://localhost:${port}`);
-});
-EOF
 
     echo "Clearing initial password(s) set during base installation..."
     jq '.auth.config = []' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
@@ -1076,21 +984,123 @@ EOF
     restart_zivpn
 
     # --- API Setup ---
-    echo "--- Setting up ZIVPN API ---"
-    # The files are created during the helper script step
-    # Install dependencies
-    (cd /etc/zivpn/api && npm install)
-    # Start with pm2 and configure startup
-    pm2 start /etc/zivpn/api/index.js --name zivpn-api
-    pm2 save
-    pm2 startup
-
-    # Firewall rule
-    if ! iptables -C INPUT -p tcp --dport 5888 -j ACCEPT > /dev/null 2>&1; then
-        iptables -I INPUT -p tcp --dport 5888 -j ACCEPT
-        echo "Port 5888 opened for API access."
+    echo "--- Setting up REST API Service ---"
+    
+    # 1. Install Node.js v18
+    if ! command -v node &> /dev/null; then
+        echo "Node.js not found. Installing Node.js v18..."
+        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+        sudo apt-get install -y nodejs
+    else
+        echo "Node.js is already installed."
     fi
     
+    # 2. Create API directory and files
+    mkdir -p /etc/zivpn/api
+    
+    cat <<'EOF' > /etc/zivpn/api/package.json
+{
+  "name": "zivpn-api",
+  "version": "1.0.0",
+  "description": "API for managing ZIVPN",
+  "main": "api.js",
+  "scripts": { "start": "node api.js" },
+  "dependencies": { "express": "^4.17.1" }
+}
+EOF
+
+    cat <<'EOF' > /etc/zivpn/api/api.js
+const express = require('express');
+const { execFile } = require('child_process');
+const fs = require('fs');
+const app = express();
+const PORT = 5888;
+const AUTH_KEY_PATH = '/etc/zivpn/api_auth.key';
+const ZIVPN_MANAGER_SCRIPT = '/usr/local/bin/zivpn-manager';
+
+const authenticate = (req, res, next) => {
+    const providedAuthKey = req.query.auth;
+    if (!providedAuthKey) return res.status(401).json({ status: 'error', message: 'Authentication key is required.' });
+
+    fs.readFile(AUTH_KEY_PATH, 'utf8', (err, storedKey) => {
+        if (err) return res.status(500).json({ status: 'error', message: 'Could not read authentication key.' });
+        if (providedAuthKey.trim() !== storedKey.trim()) return res.status(403).json({ status: 'error', message: 'Invalid authentication key.' });
+        next();
+    });
+};
+app.use(authenticate);
+
+const executeZivpnManager = (command, args, res) => {
+    execFile('sudo', [ZIVPN_MANAGER_SCRIPT, command, ...args], (error, stdout, stderr) => {
+        if (error) {
+            const errorMessage = stderr.includes('Error:') ? stderr : 'An internal server error occurred.';
+            return res.status(500).json({ status: 'error', message: errorMessage.trim() });
+        }
+        if (stdout.toLowerCase().includes('success')) {
+            res.json({ status: 'success', message: stdout.trim() });
+        } else {
+            res.status(400).json({ status: 'error', message: stdout.trim() });
+        }
+    });
+};
+
+app.post('/create/zivpn', (req, res) => {
+    const { password, exp } = req.query;
+    if (!password || !exp) return res.status(400).json({ status: 'error', message: 'Parameters password and exp are required.' });
+    executeZivpnManager('create_account', [password, exp], res);
+});
+app.post('/delete/zivpn', (req, res) => {
+    const { password } = req.query;
+    if (!password) return res.status(400).json({ status: 'error', message: 'Parameter password is required.' });
+    executeZivpnManager('delete_account', [password], res);
+});
+app.post('/renew/zivpn', (req, res) => {
+    const { password, exp } = req.query;
+    if (!password || !exp) return res.status(400).json({ status: 'error', message: 'Parameters password and exp are required.' });
+    executeZivpnManager('renew_account', [password, exp], res);
+});
+app.post('/trial/zivpn', (req, res) => {
+    const { exp } = req.query;
+    if (!exp) return res.status(400).json({ status: 'error', message: 'Parameter exp is required.' });
+    executeZivpnManager('trial_account', [exp], res);
+});
+
+app.listen(PORT, () => console.log('ZIVPN API server running on port ' + PORT));
+EOF
+
+    # 3. Install npm dependencies
+    echo "Installing API dependencies..."
+    npm install --prefix /etc/zivpn/api
+    
+    # 4. Create and enable systemd service
+    cat <<'EOF' > /etc/systemd/system/zivpn-api.service
+[Unit]
+Description=ZIVPN REST API Service
+After=network.target
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/etc/zivpn/api
+ExecStart=/usr/bin/node /etc/zivpn/api/api.js
+Restart=on-failure
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    systemctl daemon-reload
+    systemctl enable zivpn-api.service
+    systemctl start zivpn-api.service
+    
+    # 5. Generate initial API key
+    echo "Generating initial API key..."
+    local initial_api_key
+    initial_api_key=$(LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 6)
+    echo "$initial_api_key" > /etc/zivpn/api_auth.key
+    chmod 600 /etc/zivpn/api_auth.key
+    
+    echo "--- API Setup Complete ---"
+
+
     # --- System Integration ---
     echo "--- Integrating management script into the system ---"
     cp "$0" /usr/local/bin/zivpn-manager
@@ -1117,6 +1127,31 @@ EOF
 
 # --- Main Script ---
 function main() {
+    # Non-interactive mode for API calls
+    if [ "$#" -gt 0 ]; then
+        local command="$1"
+        shift
+        case "$command" in
+            create_account)
+                _create_account_logic "$@"
+                ;;
+            delete_account)
+                _delete_account_logic "$@"
+                ;;
+            renew_account)
+                _renew_account_logic "$@"
+                ;;
+            trial_account)
+                _create_trial_account_logic "$@"
+                ;;
+            *)
+                echo "Error: Unknown command '$command'"
+                exit 1
+                ;;
+        esac
+        exit $?
+    fi
+
     if [ ! -f "/etc/systemd/system/zivpn.service" ]; then
         run_setup
     fi
@@ -1128,5 +1163,5 @@ function main() {
 
 # Execute main function only when script is run directly, not sourced
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main
+    main "$@"
 fi
