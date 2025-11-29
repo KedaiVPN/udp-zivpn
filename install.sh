@@ -781,9 +781,8 @@ else
         host=$(get_host)
         local isp
         isp=$(get_isp)
-        local remaining_days=$(((expiry_timestamp_remote - current_timestamp) / 86400))
         log "Sending rich renewed notification via helper script..."
-        /usr/local/bin/zivpn_helper.sh renewed-notification "$host" "$SERVER_IP" "$CLIENT_NAME" "$isp" "$remaining_days"
+        /usr/local/bin/zivpn_helper.sh renewed-notification "$host" "$SERVER_IP" "$CLIENT_NAME" "$isp" "$expiry_timestamp_remote"
     else
         log "License is active and valid. No action needed."
     fi
