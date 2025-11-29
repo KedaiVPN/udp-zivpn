@@ -13,7 +13,18 @@ rm /etc/systemd/system/zivpn.service 1> /dev/null 2> /dev/null
 # Kill any running process
 killall zivpn 1> /dev/null 2> /dev/null
 
+# Stop and remove API service from pm2
+pm2 stop zivpn-api 1> /dev/null 2> /dev/null
+pm2 delete zivpn-api 1> /dev/null 2> /dev/null
+pm2 save --force 1> /dev/null 2> /dev/null
+
+# Remove firewall rule
+iptables -D INPUT -p tcp --dport 5888 -j ACCEPT 1> /dev/null 2> /dev/null
+
 # Remove directories, binaries, and license files
+rm -rf /etc/zivpn/api 1> /dev/null 2> /dev/null
+rm -f /etc/zivpn/api.auth 1> /dev/null 2> /dev/null
+rm -f /usr/local/bin/zivpn_api_helper.sh 1> /dev/null 2> /dev/null
 rm -f /etc/zivpn/license_checker.sh 1> /dev/null 2> /dev/null
 rm -f /etc/zivpn/.license_info 1> /dev/null 2> /dev/null
 rm -f /etc/zivpn/.expired 1> /dev/null 2> /dev/null
@@ -21,6 +32,7 @@ rm -rf /etc/zivpn 1> /dev/null 2> /dev/null # Finally remove the whole directory
 rm -f /usr/local/bin/zivpn 1> /dev/null 2> /dev/null
 rm -f /usr/local/bin/zivpn-manager 1> /dev/null 2> /dev/null
 rm -f /usr/local/bin/zivpn_helper.sh 1> /dev/null 2> /dev/null
+
 
 # Remove specific cron jobs
 (crontab -l 2>/dev/null | grep -v "# zivpn-expiry-check") | crontab -
