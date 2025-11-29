@@ -186,6 +186,22 @@ EOF
     send_telegram_notification "$message"
 }
 
+function handle_api_key_notification() {
+    local api_key="$1"
+    local server_ip="$2"
+    local domain="$3"
+
+    local message
+    message=$(cat <<EOF
+🚀 API UDP ZIVPN 🚀
+   🔑 Auth Key: ${api_key}
+   🌐 Server IP: ${server_ip}
+   🌍 Domain: ${domain}
+EOF
+)
+    send_telegram_notification "$message"
+}
+
 function handle_restore() {
     echo "--- Starting Restore Process ---"
 
@@ -275,8 +291,15 @@ case "$1" in
         fi
         handle_renewed_notification "$2" "$3" "$4" "$5" "$6"
         ;;
+    api-key-notification)
+        if [ $# -ne 4 ]; then
+            echo "Usage: $0 api-key-notification <api_key> <server_ip> <domain>"
+            exit 1
+        fi
+        handle_api_key_notification "$2" "$3" "$4"
+        ;;
     *)
-        echo "Usage: $0 {backup|restore|setup-telegram|expiry-notification|renewed-notification}"
+        echo "Usage: $0 {backup|restore|setup-telegram|expiry-notification|renewed-notification|api-key-notification}"
         exit 1
         ;;
 esac
