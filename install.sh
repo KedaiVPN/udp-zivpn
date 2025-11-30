@@ -77,6 +77,52 @@ function restart_zivpn() {
 }
 
 # --- Internal Logic Functions (for API calls) ---
+function _create_account_api_logic() {
+    local password_base="$1"
+    local days="$2"
+    local db_file="/etc/zivpn/users.db"
+
+    if [ -z "$password_base" ] || [ -z "$days" ]; then
+        echo "Error: Password and days are required."
+        return 1
+    fi
+
+    if ! [[ "$days" =~ ^[0-9]+$ ]]; then
+        echo "Error: Invalid number of days."
+        return 1
+    fi
+
+    # Generate random suffix and create the new password
+    local random_suffix
+    random_suffix=$(LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 6)
+    local password="${password_base}${random_suffix}"
+
+    if grep -q "^${password}:" "$db_file"; then
+        # In the unlikely event of a collision, we can just error out.
+        echo "Error: A user with the generated password '${password}' already exists. Please try again."
+        return 1
+    fi
+
+    local expiry_date
+    expiry_date=$(date -d "+$days days" +%s)
+    echo "${password}:${expiry_date}" >> "$db_file"
+
+    # Use a temporary file for atomic write
+    jq --arg pass "$password" '.auth.config += [$pass]' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
+
+    if [ $? -eq 0 ]; then
+        # IMPORTANT: The success message now returns the *new* full password
+        echo "Success: Account '${password_base}' created with password '${password}', expires in ${days} days."
+        restart_zivpn
+        return 0
+    else
+        # Rollback the change in users.db if config update fails
+        sed -i "/^${password}:/d" "$db_file"
+        echo "Error: Failed to update config.json."
+        return 1
+    fi
+}
+
 function _create_account_logic() {
     local password="$1"
     local days="$2"
@@ -1137,7 +1183,7 @@ function main() {
         shift
         case "$command" in
             create_account)
-                _create_account_logic "$@"
+                _create_account_api_logic "$@"
                 ;;
             delete_account)
                 _delete_account_logic "$@"
