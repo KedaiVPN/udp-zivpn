@@ -1098,6 +1098,21 @@ const authenticate = (req, res, next) => {
 };
 app.use(authenticate);
 
+// Rate Limiting Logic
+const requestLimits = {};
+const RATE_LIMIT_DURATION = 20000; // 20 seconds
+
+const checkRateLimit = (username) => {
+    if (requestLimits[username]) {
+        return false;
+    }
+    requestLimits[username] = true;
+    setTimeout(() => {
+        delete requestLimits[username];
+    }, RATE_LIMIT_DURATION);
+    return true;
+};
+
 const executeZivpnManager = (command, args, res) => {
     execFile('sudo', [ZIVPN_MANAGER_SCRIPT, command, ...args], (error, stdout, stderr) => {
         if (error) {
@@ -1115,6 +1130,11 @@ const executeZivpnManager = (command, args, res) => {
 app.all('/create/zivpn', (req, res) => {
     const { password, exp } = req.query;
     if (!password || !exp) return res.status(400).json({ status: 'error', message: 'Parameters password and exp are required.' });
+    
+    if (!checkRateLimit(password)) {
+        return res.status(429).json({ status: 'error', message: 'Rate limit exceeded. Please wait 20 seconds before creating/renewing this account again.' });
+    }
+
     executeZivpnManager('create_account', [password, exp], res);
 });
 app.all('/delete/zivpn', (req, res) => {
@@ -1125,6 +1145,11 @@ app.all('/delete/zivpn', (req, res) => {
 app.all('/renew/zivpn', (req, res) => {
     const { password, exp } = req.query;
     if (!password || !exp) return res.status(400).json({ status: 'error', message: 'Parameters password and exp are required.' });
+
+    if (!checkRateLimit(password)) {
+        return res.status(429).json({ status: 'error', message: 'Rate limit exceeded. Please wait 20 seconds before creating/renewing this account again.' });
+    }
+
     executeZivpnManager('renew_account', [password, exp], res);
 });
 app.all('/trial/zivpn', (req, res) => {
@@ -1178,14 +1203,18 @@ EOF
     cp "$0" /usr/local/bin/zivpn-manager
     chmod +x /usr/local/bin/zivpn-manager
 
+    # Add alias and auto-run to .bashrc for interactive shells
     PROFILE_FILE="/root/.bashrc"
-    if [ -f "/root/.bash_profile" ]; then PROFILE_FILE="/root/.bash_profile"; fi
     
     ALIAS_CMD="alias menu='/usr/local/bin/zivpn-manager'"
-    AUTORUN_CMD="/usr/local/bin/zivpn-manager"
+    
+    # Safe auto-run: check for interactive shell before running menu
+    AUTORUN_CMD="if [[ \$- == *i* ]]; then /usr/local/bin/zivpn-manager; fi"
 
-    grep -qF "$ALIAS_CMD" "$PROFILE_FILE" || echo "$ALIAS_CMD" >> "$PROFILE_FILE"
-    grep -qF "$AUTORUN_CMD" "$PROFILE_FILE" || echo "$AUTORUN_CMD" >> "$PROFILE_FILE"
+    if [ -f "$PROFILE_FILE" ]; then
+        grep -qF "$ALIAS_CMD" "$PROFILE_FILE" || echo "$ALIAS_CMD" >> "$PROFILE_FILE"
+        grep -qF "/usr/local/bin/zivpn-manager" "$PROFILE_FILE" || echo "$AUTORUN_CMD" >> "$PROFILE_FILE"
+    fi
 
     echo "The 'menu' command is now available."
     echo "The management menu will now open automatically on login."
