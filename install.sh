@@ -512,18 +512,25 @@ function list_accounts() {
     read -p "Press Enter to return to the menu..."
 }
 
-function format_kib_to_human() {
-    local kib=$1
-    if ! [[ "$kib" =~ ^[0-9]+$ ]] || [ -z "$kib" ]; then
-        kib=0
+function format_bytes_to_human() {
+    local bytes=$1
+    if ! [[ "$bytes" =~ ^[0-9]+$ ]] || [ -z "$bytes" ]; then
+        bytes=0
     fi
     
-    # Using awk for floating point math
-    if [ "$kib" -lt 1048576 ]; then
-        awk -v val="$kib" 'BEGIN { printf "%.2f MiB", val / 1024 }'
-    else
-        awk -v val="$kib" 'BEGIN { printf "%.2f GiB", val / 1048576 }'
-    fi
+    awk -v val="$bytes" 'BEGIN {
+        if (val < 1024) {
+            printf "%.2f B", val
+        } else if (val < 1048576) {
+            printf "%.2f KiB", val / 1024
+        } else if (val < 1073741824) {
+            printf "%.2f MiB", val / 1048576
+        } else if (val < 1099511627776) {
+            printf "%.2f GiB", val / 1073741824
+        } else {
+            printf "%.2f TiB", val / 1099511627776
+        }
+    }'
 }
 
 function get_main_interface() {
@@ -562,25 +569,35 @@ function _draw_info_panel() {
         current_month=$(date +%-m) # Use %-m to avoid leading zero
         current_day=$(date +%-d) # Use %-d to avoid leading zero for days < 10
 
-        # Daily
-        local today_total_kib=0
-        local vnstat_daily_json
-        vnstat_daily_json=$(vnstat --json d 2>/dev/null)
-        if [[ -n "$vnstat_daily_json" && "$vnstat_daily_json" == "{"* ]]; then
-            today_total_kib=$(echo "$vnstat_daily_json" | jq --arg iface "$iface" --argjson year "$current_year" --argjson month "$current_month" --argjson day "$current_day" '((.interfaces[] | select(.name == $iface) | .traffic.days // [])[] | select(.date.year == $year and .date.month == $month and .date.day == $day) | .total) // 0' | head -n 1)
-        fi
-        today_total_kib=${today_total_kib:-0}
-        bw_today=$(format_kib_to_human "$today_total_kib")
+        # Run vnstat --json once to get all data (vnstat 2.x compatible)
+        local vnstat_json
+        vnstat_json=$(vnstat --json 2>/dev/null)
 
-        # Monthly
-        local month_total_kib=0
-        local vnstat_monthly_json
-        vnstat_monthly_json=$(vnstat --json m 2>/dev/null)
-        if [[ -n "$vnstat_monthly_json" && "$vnstat_monthly_json" == "{"* ]]; then
-            month_total_kib=$(echo "$vnstat_monthly_json" | jq --arg iface "$iface" --argjson year "$current_year" --argjson month "$current_month" '((.interfaces[] | select(.name == $iface) | .traffic.months // [])[] | select(.date.year == $year and .date.month == $month) | .total) // 0' | head -n 1)
+        # Daily (Sum rx + tx from .traffic.day)
+        local today_bytes=0
+        if [[ -n "$vnstat_json" && "$vnstat_json" == "{"* ]]; then
+            today_bytes=$(echo "$vnstat_json" | jq --arg iface "$iface" --argjson year "$current_year" --argjson month "$current_month" --argjson day "$current_day" '
+              (
+                (.interfaces[] | select(.name == $iface) | .traffic.day // [])[] 
+                | select(.date.year == $year and .date.month == $month and .date.day == $day) 
+                | .rx + .tx
+              ) // 0
+            ' | head -n 1)
         fi
-        month_total_kib=${month_total_kib:-0}
-        bw_month=$(format_kib_to_human "$month_total_kib")
+        bw_today=$(format_bytes_to_human "$today_bytes")
+
+        # Monthly (Sum rx + tx from .traffic.month)
+        local month_bytes=0
+        if [[ -n "$vnstat_json" && "$vnstat_json" == "{"* ]]; then
+             month_bytes=$(echo "$vnstat_json" | jq --arg iface "$iface" --argjson year "$current_year" --argjson month "$current_month" '
+              (
+                (.interfaces[] | select(.name == $iface) | .traffic.month // [])[] 
+                | select(.date.year == $year and .date.month == $month) 
+                | .rx + .tx
+              ) // 0
+            ' | head -n 1)
+        fi
+        bw_month=$(format_bytes_to_human "$month_bytes")
 
     else
         bw_today="N/A"
@@ -637,7 +654,12 @@ function _draw_service_status() {
         status_color="${RED}"
     fi
 
-    status_output="${CYAN}Service: ${status_color}${status_text}${NC}"
+    local user_count=0
+    if [ -f "/etc/zivpn/users.db" ]; then
+        user_count=$(wc -l < "/etc/zivpn/users.db")
+    fi
+
+    status_output="${CYAN}Service: ${status_color}${status_text}   ${CYAN}User: ${LIGHT_GREEN}${user_count}${NC}"
     
     # Center the text
     local menu_width=55  # Total width of the menu box including borders
