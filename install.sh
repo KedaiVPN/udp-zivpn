@@ -578,8 +578,8 @@ function _draw_info_panel() {
         if [[ -n "$vnstat_json" && "$vnstat_json" == "{"* ]]; then
             today_bytes=$(echo "$vnstat_json" | jq --arg iface "$iface" --argjson year "$current_year" --argjson month "$current_month" --argjson day "$current_day" '
               (
-                (.interfaces[] | select(.name == $iface) | .traffic.day // [])[]
-                | select(.date.year == $year and .date.month == $month and .date.day == $day)
+                (.interfaces[] | select(.name == $iface) | .traffic.day // [])[] 
+                | select(.date.year == $year and .date.month == $month and .date.day == $day) 
                 | .rx + .tx
               ) // 0
             ' | head -n 1)
@@ -591,8 +591,8 @@ function _draw_info_panel() {
         if [[ -n "$vnstat_json" && "$vnstat_json" == "{"* ]]; then
              month_bytes=$(echo "$vnstat_json" | jq --arg iface "$iface" --argjson year "$current_year" --argjson month "$current_month" '
               (
-                (.interfaces[] | select(.name == $iface) | .traffic.month // [])[]
-                | select(.date.year == $year and .date.month == $month)
+                (.interfaces[] | select(.name == $iface) | .traffic.month // [])[] 
+                | select(.date.year == $year and .date.month == $month) 
                 | .rx + .tx
               ) // 0
             ' | head -n 1)
