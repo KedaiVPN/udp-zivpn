@@ -1056,8 +1056,8 @@ EOF
     
     # 1. Install Node.js v18
     if ! command -v node &> /dev/null; then
-        echo "Node.js not found. Installing Node.js v18..."
-        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+        echo "Node.js not found. Installing Node.js v20..."
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
         sudo apt-get install -y nodejs
     else
         echo "Node.js is already installed."
