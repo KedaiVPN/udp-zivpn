@@ -22,10 +22,35 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # --- License Verification Function ---
+function get_public_ip() {
+    local ip=""
+    # List of services to try
+    local services=(
+        "https://api.ipify.org"
+        "https://ifconfig.me/ip"
+        "https://icanhazip.com"
+        "https://ipinfo.io/ip"
+        "https://checkip.amazonaws.com"
+    )
+
+    for service in "${services[@]}"; do
+        # Use curl with timeout, silence output, follow redirects
+        ip=$(curl -s --max-time 3 "$service" | tr -d '[:space:]')
+
+        # Check if the retrieved string is a valid IPv4 address
+        if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            echo "$ip"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 function verify_license() {
     echo "Verifying installation license..."
     local SERVER_IP
-    SERVER_IP=$(curl -s ifconfig.me)
+    SERVER_IP=$(get_public_ip)
     if [ -z "$SERVER_IP" ]; then
         echo -e "${RED}Failed to retrieve server IP. Please check your internet connection.${NC}"
         exit 1
@@ -194,7 +219,7 @@ function create_manual_account() {
             CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p')
             local HOST
             if [ "$CERT_CN" == "zivpn" ]; then
-                HOST=$(curl -s ifconfig.me)
+                HOST=$(get_public_ip)
             else
                 HOST=$CERT_CN
             fi
@@ -238,7 +263,7 @@ function _generate_api_key() {
     echo "Sending API key to Telegram..."
     # Get Server IP and Domain for the notification
     local server_ip
-    server_ip=$(curl -s ifconfig.me)
+    server_ip=$(get_public_ip)
     local cert_cn
     cert_cn=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p' 2>/dev/null || echo "")
     local domain
@@ -308,7 +333,7 @@ function create_trial_account() {
             CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p')
             local HOST
             if [ "$CERT_CN" == "zivpn" ]; then
-                HOST=$(curl -s ifconfig.me)
+                HOST=$(get_public_ip)
             else
                 HOST=$CERT_CN
             fi
@@ -911,11 +936,42 @@ log() {
 }
 
 # --- Helper Functions ---
+function get_public_ip() {
+    local ip=""
+    # List of services to try
+    local services=(
+        "https://api.ipify.org"
+        "https://ifconfig.me/ip"
+        "https://icanhazip.com"
+        "https://ipinfo.io/ip"
+        "https://checkip.amazonaws.com"
+    )
+
+    for service in "${services[@]}"; do
+        # Use curl with timeout, silence output, follow redirects
+        ip=$(curl -s --max-time 3 "$service" | tr -d '[:space:]')
+
+        # Check if the retrieved string is a valid IPv4 address
+        if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            echo "$ip"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 function get_host() {
     local CERT_CN
     CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p' 2>/dev/null || echo "")
     if [ "$CERT_CN" == "zivpn" ] || [ -z "$CERT_CN" ]; then
-        curl -s ifconfig.me
+        local ip
+        ip=$(get_public_ip)
+        if [ -n "$ip" ]; then
+            echo "$ip"
+        else
+            echo "N/A"
+        fi
     else
         echo "$CERT_CN"
     fi
@@ -949,7 +1005,7 @@ send_telegram_message() {
 log "Starting license check..."
 
 # 1. Get Server IP
-SERVER_IP=$(curl -s ifconfig.me)
+SERVER_IP=$(get_public_ip)
 if [ -z "$SERVER_IP" ]; then
     log "Error: Failed to retrieve server IP. Exiting."
     exit 1
