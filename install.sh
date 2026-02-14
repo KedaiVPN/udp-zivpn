@@ -936,6 +936,31 @@ log() {
 }
 
 # --- Helper Functions ---
+function get_public_ip() {
+    local ip=""
+    # List of services to try
+    local services=(
+        "https://api.ipify.org"
+        "https://ifconfig.me/ip"
+        "https://icanhazip.com"
+        "https://ipinfo.io/ip"
+        "https://checkip.amazonaws.com"
+    )
+
+    for service in "${services[@]}"; do
+        # Use curl with timeout, silence output, follow redirects
+        ip=$(curl -s --max-time 3 "$service" | tr -d '[:space:]')
+        
+        # Check if the retrieved string is a valid IPv4 address
+        if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            echo "$ip"
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
 function get_host() {
     local CERT_CN
     CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p' 2>/dev/null || echo "")
@@ -1243,8 +1268,19 @@ EOF
     AUTORUN_CMD="if [[ \$- == *i* ]]; then /usr/local/bin/zivpn-manager; fi"
 
     if [ -f "$PROFILE_FILE" ]; then
+        # Add alias if missing
         grep -qF "$ALIAS_CMD" "$PROFILE_FILE" || echo "$ALIAS_CMD" >> "$PROFILE_FILE"
-        grep -qF "/usr/local/bin/zivpn-manager" "$PROFILE_FILE" || echo "$AUTORUN_CMD" >> "$PROFILE_FILE"
+        
+        # Add auto-run if missing
+        if ! grep -qF "if [[ \$- == *i* ]]; then /usr/local/bin/zivpn-manager; fi" "$PROFILE_FILE"; then
+            echo "" >> "$PROFILE_FILE"
+            echo "$AUTORUN_CMD" >> "$PROFILE_FILE"
+            echo "Auto-start added to $PROFILE_FILE"
+        else
+            echo "Auto-start already present in $PROFILE_FILE"
+        fi
+    else
+        echo "Warning: $PROFILE_FILE not found. Auto-start could not be configured."
     fi
     
     # Ensure .bash_profile or .profile sources .bashrc
