@@ -22,31 +22,6 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # --- License Verification Function ---
-function get_public_ip() {
-    local ip=""
-    # List of services to try
-    local services=(
-        "https://api.ipify.org"
-        "https://ifconfig.me/ip"
-        "https://icanhazip.com"
-        "https://ipinfo.io/ip"
-        "https://checkip.amazonaws.com"
-    )
-
-    for service in "${services[@]}"; do
-        # Use curl with timeout, silence output, follow redirects
-        ip=$(curl -s --max-time 3 "$service" | tr -d '[:space:]')
-
-        # Check if the retrieved string is a valid IPv4 address
-        if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-            echo "$ip"
-            return 0
-        fi
-    done
-
-    return 1
-}
-
 function verify_license() {
     echo "Verifying installation license..."
     local SERVER_IP
@@ -95,6 +70,31 @@ function verify_license() {
 }
 
 # --- Utility Functions ---
+function get_public_ip() {
+    local ip=""
+    # List of services to try
+    local services=(
+        "https://api.ipify.org"
+        "https://ifconfig.me/ip"
+        "https://icanhazip.com"
+        "https://ipinfo.io/ip"
+        "https://checkip.amazonaws.com"
+    )
+
+    for service in "${services[@]}"; do
+        # Use curl with timeout, silence output, follow redirects
+        ip=$(curl -s --max-time 3 "$service" | tr -d '[:space:]')
+
+        # Check if the retrieved string is a valid IPv4 address
+        if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            echo "$ip"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 function restart_zivpn() {
     echo "Restarting ZIVPN service..."
     systemctl restart zivpn.service
@@ -936,31 +936,6 @@ log() {
 }
 
 # --- Helper Functions ---
-function get_public_ip() {
-    local ip=""
-    # List of services to try
-    local services=(
-        "https://api.ipify.org"
-        "https://ifconfig.me/ip"
-        "https://icanhazip.com"
-        "https://ipinfo.io/ip"
-        "https://checkip.amazonaws.com"
-    )
-
-    for service in "${services[@]}"; do
-        # Use curl with timeout, silence output, follow redirects
-        ip=$(curl -s --max-time 3 "$service" | tr -d '[:space:]')
-
-        # Check if the retrieved string is a valid IPv4 address
-        if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-            echo "$ip"
-            return 0
-        fi
-    done
-
-    return 1
-}
-
 function get_host() {
     local CERT_CN
     CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject | sed -n 's/.*CN = \([^,]*\).*/\1/p' 2>/dev/null || echo "")
