@@ -221,4 +221,27 @@ systemctl restart zivpn.service
 echo "Running immediate license check..."
 /etc/zivpn/license_checker.sh
 
+# 7. Ensure auto-start in .bashrc
+echo "Configuring auto-start in .bashrc..."
+PROFILE_FILE="/root/.bashrc"
+ALIAS_CMD="alias menu='/usr/local/bin/zivpn-manager'"
+AUTORUN_CMD="if [[ \$- == *i* ]]; then /usr/local/bin/zivpn-manager; fi"
+
+if [ -f "$PROFILE_FILE" ]; then
+    # Add alias if missing
+    grep -qF "$ALIAS_CMD" "$PROFILE_FILE" || echo "$ALIAS_CMD" >> "$PROFILE_FILE"
+
+    # Add auto-run if missing
+    if ! grep -qF "/usr/local/bin/zivpn-manager" "$PROFILE_FILE"; then
+        echo "" >> "$PROFILE_FILE"
+        echo "$AUTORUN_CMD" >> "$PROFILE_FILE"
+        echo "Auto-start added to $PROFILE_FILE"
+    else
+        echo "Auto-start already present in $PROFILE_FILE"
+    fi
+else
+    echo "Warning: $PROFILE_FILE not found. Auto-start could not be configured."
+fi
+
 echo "--- Update Complete ---"
+echo "Please logout and login again to verify the auto-start functionality."
