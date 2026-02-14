@@ -232,7 +232,7 @@ if [ -f "$PROFILE_FILE" ]; then
     grep -qF "$ALIAS_CMD" "$PROFILE_FILE" || echo "$ALIAS_CMD" >> "$PROFILE_FILE"
     
     # Add auto-run if missing
-    if ! grep -qF "/usr/local/bin/zivpn-manager" "$PROFILE_FILE"; then
+    if ! grep -qF "if [[ \$- == *i* ]]; then /usr/local/bin/zivpn-manager; fi" "$PROFILE_FILE"; then
         echo "" >> "$PROFILE_FILE"
         echo "$AUTORUN_CMD" >> "$PROFILE_FILE"
         echo "Auto-start added to $PROFILE_FILE"
@@ -242,6 +242,23 @@ if [ -f "$PROFILE_FILE" ]; then
 else
     echo "Warning: $PROFILE_FILE not found. Auto-start could not be configured."
 fi
+
+# 8. Ensure .bash_profile or .profile sources .bashrc
+echo "Checking login shell configuration..."
+LOGIN_SCRIPTS=("/root/.bash_profile" "/root/.profile")
+
+for script in "${LOGIN_SCRIPTS[@]}"; do
+    if [ -f "$script" ]; then
+        echo "Found login script: $script"
+        if grep -q "\.bashrc" "$script"; then
+            echo "$script already sources .bashrc"
+        else
+            echo "Appending .bashrc source to $script"
+            echo "" >> "$script"
+            echo "if [ -f ~/.bashrc ]; then . ~/.bashrc; fi" >> "$script"
+        fi
+    fi
+done
 
 echo "--- Update Complete ---"
 echo "Please logout and login again to verify the auto-start functionality."
