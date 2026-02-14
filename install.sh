@@ -1246,6 +1246,23 @@ EOF
         grep -qF "$ALIAS_CMD" "$PROFILE_FILE" || echo "$ALIAS_CMD" >> "$PROFILE_FILE"
         grep -qF "/usr/local/bin/zivpn-manager" "$PROFILE_FILE" || echo "$AUTORUN_CMD" >> "$PROFILE_FILE"
     fi
+    
+    # Ensure .bash_profile or .profile sources .bashrc
+    echo "Checking login shell configuration..."
+    LOGIN_SCRIPTS=("/root/.bash_profile" "/root/.profile")
+
+    for script in "${LOGIN_SCRIPTS[@]}"; do
+        if [ -f "$script" ]; then
+            echo "Found login script: $script"
+            if grep -q "\.bashrc" "$script"; then
+                echo "$script already sources .bashrc"
+            else
+                echo "Appending .bashrc source to $script"
+                echo "" >> "$script"
+                echo "if [ -f ~/.bashrc ]; then . ~/.bashrc; fi" >> "$script"
+            fi
+        fi
+    done
 
     echo "The 'menu' command is now available."
     echo "The management menu will now open automatically on login."
