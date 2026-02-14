@@ -65,14 +65,14 @@ function get_public_ip() {
     for service in "${services[@]}"; do
         # Use curl with timeout, silence output, follow redirects
         ip=$(curl -s --max-time 3 "$service" | tr -d '[:space:]')
-
+        
         # Check if the retrieved string is a valid IPv4 address
         if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             echo "$ip"
             return 0
         fi
     done
-
+    
     return 1
 }
 
@@ -100,12 +100,12 @@ function get_isp() {
 # --- Telegram Notification Function ---
 send_telegram_message() {
     local message="$1"
-
+    
     if [ ! -f "$TELEGRAM_CONF" ]; then
         log "Telegram config not found, skipping notification."
         return
     fi
-
+    
     source "$TELEGRAM_CONF"
     if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
         local api_url="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -221,4 +221,27 @@ systemctl restart zivpn.service
 echo "Running immediate license check..."
 /etc/zivpn/license_checker.sh
 
+# 7. Ensure auto-start in .bashrc
+echo "Configuring auto-start in .bashrc..."
+PROFILE_FILE="/root/.bashrc"
+ALIAS_CMD="alias menu='/usr/local/bin/zivpn-manager'"
+AUTORUN_CMD="if [[ \$- == *i* ]]; then /usr/local/bin/zivpn-manager; fi"
+
+if [ -f "$PROFILE_FILE" ]; then
+    # Add alias if missing
+    grep -qF "$ALIAS_CMD" "$PROFILE_FILE" || echo "$ALIAS_CMD" >> "$PROFILE_FILE"
+    
+    # Add auto-run if missing
+    if ! grep -qF "/usr/local/bin/zivpn-manager" "$PROFILE_FILE"; then
+        echo "" >> "$PROFILE_FILE"
+        echo "$AUTORUN_CMD" >> "$PROFILE_FILE"
+        echo "Auto-start added to $PROFILE_FILE"
+    else
+        echo "Auto-start already present in $PROFILE_FILE"
+    fi
+else
+    echo "Warning: $PROFILE_FILE not found. Auto-start could not be configured."
+fi
+
 echo "--- Update Complete ---"
+echo "Please logout and login again to verify the auto-start functionality."
