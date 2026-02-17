@@ -517,6 +517,11 @@ function _display_accounts() {
     echo "------------------------------------------"
     while IFS=':' read -r password expiry_date; do
         if [[ -n "$password" ]]; then
+            if ! [[ "$expiry_date" =~ ^[0-9]+$ ]]; then
+                printf "%-20s | Invalid Expiry Date\n" "$password"
+                continue
+            fi
+
             local remaining_seconds=$((expiry_date - current_date))
             if [ $remaining_seconds -gt 0 ]; then
                 local remaining_days=$((remaining_seconds / 86400))
@@ -894,6 +899,12 @@ if [ ! -f "$DB_FILE" ]; then exit 0; fi
 
 while IFS=':' read -r password expiry_date; do
     if [[ -z "$password" ]]; then continue; fi
+
+    if ! [[ "$expiry_date" =~ ^[0-9]+$ ]]; then
+        # Preserve invalid entries
+        echo "${password}:${expiry_date}" >> "$TMP_DB_FILE"
+        continue
+    fi
 
     if [ "$expiry_date" -le "$CURRENT_DATE" ]; then
         echo "User '${password}' has expired. Deleting permanently."

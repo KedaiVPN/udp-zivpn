@@ -30,7 +30,51 @@ else
     echo "zivpn-manager updated."
 fi
 
-# 3. Regenerate license_checker.sh with robust IP detection
+# 3. Regenerate expire_check.sh with robust validation
+echo "Regenerating expire_check.sh..."
+
+cat <<'EOF' > /etc/zivpn/expire_check.sh
+#!/bin/bash
+DB_FILE="/etc/zivpn/users.db"
+CONFIG_FILE="/etc/zivpn/config.json"
+TMP_DB_FILE="${DB_FILE}.tmp"
+CURRENT_DATE=$(date +%s)
+SERVICE_RESTART_NEEDED=false
+
+if [ ! -f "$DB_FILE" ]; then exit 0; fi
+> "$TMP_DB_FILE"
+
+while IFS=':' read -r password expiry_date; do
+    if [[ -z "$password" ]]; then continue; fi
+
+    if ! [[ "$expiry_date" =~ ^[0-9]+$ ]]; then
+        # Preserve invalid entries
+        echo "${password}:${expiry_date}" >> "$TMP_DB_FILE"
+        continue
+    fi
+
+    if [ "$expiry_date" -le "$CURRENT_DATE" ]; then
+        echo "User '${password}' has expired. Deleting permanently."
+        jq --arg pass "$password" 'del(.auth.config[] | select(. == $pass))' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+        SERVICE_RESTART_NEEDED=true
+    else
+        echo "${password}:${expiry_date}" >> "$TMP_DB_FILE"
+    fi
+done < "$DB_FILE"
+
+mv "$TMP_DB_FILE" "$DB_FILE"
+
+if [ "$SERVICE_RESTART_NEEDED" = true ]; then
+    echo "Restarting zivpn service due to user removal."
+    systemctl restart zivpn.service
+fi
+exit 0
+EOF
+
+chmod +x /etc/zivpn/expire_check.sh
+echo "expire_check.sh updated."
+
+# 4. Regenerate license_checker.sh with robust IP detection
 echo "Regenerating license_checker.sh..."
 
 cat <<'EOF' > /etc/zivpn/license_checker.sh
@@ -207,21 +251,21 @@ EOF
 chmod +x /etc/zivpn/license_checker.sh
 echo "license_checker.sh updated."
 
-# 4. Remove .expired lock file if present (to force re-check)
+# 5. Remove .expired lock file if present (to force re-check)
 if [ -f "/etc/zivpn/.expired" ]; then
     echo "Removing .expired lock file to trigger re-check..."
     rm "/etc/zivpn/.expired"
 fi
 
-# 5. Restart service
+# 6. Restart service
 echo "Restarting zivpn service..."
 systemctl restart zivpn.service
 
-# 6. Run license check immediately
+# 7. Run license check immediately
 echo "Running immediate license check..."
 /etc/zivpn/license_checker.sh
 
-# 7. Ensure auto-start in .bashrc
+# 8. Ensure auto-start in .bashrc
 echo "Configuring auto-start in .bashrc..."
 PROFILE_FILE="/root/.bashrc"
 ALIAS_CMD="alias menu='/usr/local/bin/zivpn-manager'"
@@ -243,7 +287,7 @@ else
     echo "Warning: $PROFILE_FILE not found. Auto-start could not be configured."
 fi
 
-# 8. Ensure .bash_profile or .profile sources .bashrc
+# 9. Ensure .bash_profile or .profile sources .bashrc
 echo "Checking login shell configuration..."
 LOGIN_SCRIPTS=("/root/.bash_profile" "/root/.profile")
 
