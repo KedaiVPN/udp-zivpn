@@ -95,7 +95,13 @@ function handle_backup() {
     # shellcheck source=/etc/zivpn/telegram.conf
     source "$TELEGRAM_CONF"
 
-    local backup_filename="zivpn_backup_$(date +%Y%m%d-%H%M%S).zip"
+    local host_name
+    host_name=$(get_host)
+    if [ -z "$host_name" ] || [ "$host_name" == "N/A" ]; then
+        host_name="zivpn_backup"
+    fi
+
+    local backup_filename="${host_name}_$(date +%Y%m%d-%H%M%S).zip"
     local temp_backup_path="/tmp/${backup_filename}"
 
     echo "Creating backup archive..."
