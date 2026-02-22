@@ -22,9 +22,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/zi2.
 sudo wget -O ziun.sh https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/uninstall.sh; sudo chmod +x ziun.sh; sudo ./ziun.sh
 ```
 
-### Update / Fix License Issue
-
-Jika Anda mengalami masalah lisensi tidak terdeteksi, jalankan perintah ini di VPS Anda:
+### Update
 
 ```
 wget -O update.sh https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/update.sh; chmod +x update.sh; ./update.sh
