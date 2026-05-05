@@ -1128,6 +1128,21 @@ EOF
 
     restart_zivpn
 
+    # --- BadVPN Setup ---
+    echo "--- Setting up BadVPN UDPGW ---"
+    wget -O /usr/local/bin/badvpn.sh https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/badvpn.sh
+    if [ $? -ne 0 ]; then
+        echo "Failed to download BadVPN installer. Continuing without BadVPN."
+    else
+        chmod +x /usr/local/bin/badvpn.sh
+        /usr/local/bin/badvpn.sh
+        if [ $? -ne 0 ]; then
+            echo "BadVPN installation failed. Continuing."
+        else
+            echo "--- BadVPN UDPGW Setup Complete ---"
+        fi
+    fi
+
     # --- API Setup ---
     echo "--- Setting up REST API Service ---"
     

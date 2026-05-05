@@ -352,6 +352,21 @@ if [ -n "$CORE_IFACE" ] && [ -f /etc/systemd/system/zivpn.service ]; then
     iptables -t nat -A PREROUTING -i "${CORE_IFACE}" -p udp --dport 6000:19999 -j DNAT --to-destination :5667 > /dev/null 2>&1 || true
 fi
 
+# 6. Update and install BadVPN
+echo "Updating and installing BadVPN UDPGW..."
+wget -O /usr/local/bin/badvpn.sh https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/badvpn.sh
+if [ $? -ne 0 ]; then
+    echo "Warning: Failed to download BadVPN installer. Skipping."
+else
+    chmod +x /usr/local/bin/badvpn.sh
+    /usr/local/bin/badvpn.sh
+    if [ $? -ne 0 ]; then
+        echo "Warning: BadVPN installation failed. Skipping."
+    else
+        echo "BadVPN UDPGW Setup Complete."
+    fi
+fi
+
 # Restart services
 echo "Restarting services..."
 systemctl daemon-reload
@@ -361,4 +376,4 @@ if systemctl is-active --quiet zivpn.service; then
 fi
 
 echo "--- Update Complete ---"
-echo "License verification has been migrated to Vercel API, and persistence fixes applied."
+echo "Update applied: API migrated, persistence fixes applied, and BadVPN configured."
