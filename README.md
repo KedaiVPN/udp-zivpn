@@ -29,4 +29,3 @@ Client App available:
 > ZiVPN
                 
 ----
-Bash script by PowerMX
