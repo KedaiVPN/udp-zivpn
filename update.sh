@@ -35,7 +35,7 @@ cat <<'EOF' > /etc/zivpn/license_checker.sh
 # This script is run by a cron job to periodically check the license status.
 
 # --- Configuration ---
-LICENSE_URL="https://licence-manager-nu.vercel.app/api/check"
+LICENSE_URL="https://licence-manager-nu.vercel.app/api/check/zivpn"
 LICENSE_INFO_FILE="/etc/zivpn/.license_info"
 EXPIRED_LOCK_FILE="/etc/zivpn/.expired"
 TELEGRAM_CONF="/etc/zivpn/telegram.conf"
