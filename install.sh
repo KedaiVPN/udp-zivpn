@@ -783,6 +783,64 @@ function show_backup_menu() {
     esac
 }
 
+function manage_badvpn() {
+    while true; do
+        clear
+        echo -e "${YELLOW}╔═══════════════// ${RED}Pengaturan BadVPN${YELLOW} //═══════════════╗${NC}"
+
+        # Check active ports
+        local active_ports=()
+        for port in 7000 7100 7200 7300; do
+            if systemctl is-active --quiet badvpn${port}.service 2>/dev/null; then
+                active_ports+=("$port")
+            fi
+        done
+
+        local status_msg="badvpn off"
+        if [ ${#active_ports[@]} -gt 0 ]; then
+            status_msg="badvpn aktif: $(IFS=, ; echo "${active_ports[*]}")"
+        fi
+
+        echo -e "   ${CYAN}Status: ${LIGHT_GREEN}${status_msg}${NC}"
+        echo -e "${YELLOW}║                                                  ║${NC}"
+        echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Aktifkan/Matikan badvpn 7000                ${YELLOW}║${NC}"
+        echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Aktifkan/Matikan badvpn 7100                ${YELLOW}║${NC}"
+        echo -e "${YELLOW}║   ${RED}3)${NC} ${BOLD_WHITE}Aktifkan/Matikan badvpn 7200                ${YELLOW}║${NC}"
+        echo -e "${YELLOW}║   ${RED}4)${NC} ${BOLD_WHITE}Aktifkan/Matikan badvpn 7300                ${YELLOW}║${NC}"
+        echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Kembali ke Menu Utama                       ${YELLOW}║${NC}"
+        echo -e "${YELLOW}║                                                  ║${NC}"
+        echo -e "${YELLOW}╚══════════════════════════════════════════════════╝${NC}"
+
+        read -p "Pilih menu [0-4]: " bv_choice
+
+        local target_port=""
+        case $bv_choice in
+            1) target_port=7000 ;;
+            2) target_port=7100 ;;
+            3) target_port=7200 ;;
+            4) target_port=7300 ;;
+            0) return ;;
+            *) echo "Pilihan tidak valid."; sleep 1; continue ;;
+        esac
+
+        if [ -n "$target_port" ]; then
+            local svc="badvpn${target_port}.service"
+            if systemctl is-active --quiet "$svc" 2>/dev/null; then
+                echo "Mematikan BadVPN port $target_port..."
+                systemctl stop "$svc"
+                systemctl disable "$svc"
+                echo "BadVPN port $target_port telah dimatikan."
+            else
+                echo "Menghidupkan BadVPN port $target_port..."
+                systemctl enable "$svc"
+                systemctl start "$svc"
+                echo "BadVPN port $target_port telah diaktifkan."
+            fi
+            sleep 1
+        fi
+    done
+}
+
 function show_expired_message_and_exit() {
     clear
     echo -e "\n${RED}=====================================================${NC}"
@@ -815,11 +873,12 @@ function show_menu() {
     echo -e "${YELLOW}║   ${RED}5)${NC} ${BOLD_WHITE}List Accounts                                 ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}6)${NC} ${BOLD_WHITE}Backup/Restore                                ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}7)${NC} ${BOLD_WHITE}Generate API Auth Key                         ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}8)${NC} ${BOLD_WHITE}Pengaturan BadVPN                             ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Exit                                          ${YELLOW}║${NC}"
     echo -e "${YELLOW}║                                                    ║${NC}"
     echo -e "${YELLOW}╚════════════════════════════════════════════════════╝${NC}"
     
-    read -p "Enter your choice [0-7]: " choice
+    read -p "Enter your choice [0-8]: " choice
 
     case $choice in
         1) create_account ;;
@@ -829,6 +888,7 @@ function show_menu() {
         5) list_accounts ;;
         6) show_backup_menu ;;
         7) _generate_api_key ;;
+        8) manage_badvpn ;;
         0) exit 0 ;;
         *) echo "Invalid option. Please try again." ;;
     esac

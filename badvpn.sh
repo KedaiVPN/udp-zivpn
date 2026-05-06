@@ -41,10 +41,10 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
-    # Reload systemd, enable dan start service
+    # Reload systemd (disable and stop by default based on user request)
     systemctl daemon-reload
-    systemctl enable badvpn${PORT}.service
-    systemctl start badvpn${PORT}.service
+    systemctl disable badvpn${PORT}.service
+    systemctl stop badvpn${PORT}.service
 done
 
 # Membersihkan file instalasi
