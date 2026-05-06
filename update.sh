@@ -352,7 +352,19 @@ if [ -n "$CORE_IFACE" ] && [ -f /etc/systemd/system/zivpn.service ]; then
     iptables -t nat -A PREROUTING -i "${CORE_IFACE}" -p udp --dport 6000:19999 -j DNAT --to-destination :5667 > /dev/null 2>&1 || true
 fi
 
-# 6. Update and install BadVPN
+# 6. Update Manager Menu (install.sh -> zivpn-manager)
+echo "Updating zivpn-manager (menu)..."
+wget -O /tmp/install.sh https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/install.sh
+if [ $? -eq 0 ]; then
+    cp /tmp/install.sh /usr/local/bin/zivpn-manager
+    chmod +x /usr/local/bin/zivpn-manager
+    echo "zivpn-manager updated successfully."
+else
+    echo "Warning: Failed to update zivpn-manager."
+fi
+rm -f /tmp/install.sh
+
+# 7. Update and install BadVPN
 echo "Updating and installing BadVPN UDPGW..."
 wget -O /usr/local/bin/badvpn.sh https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/badvpn.sh
 if [ $? -ne 0 ]; then
