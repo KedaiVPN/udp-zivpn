@@ -854,6 +854,58 @@ function show_expired_message_and_exit() {
     exit 0
 }
 
+
+function install_monitor() {
+    clear
+    echo -e "${YELLOW}╔════════════════// ${RED}Install Monitor SSE${YELLOW} //════════════════╗${NC}"
+    echo "Downloading and installing VPS Monitor SSE..."
+
+    wget -q -O /tmp/monitor.sh "https://raw.githubusercontent.com/KedaiVPN/kemed/main/monitor.sh"
+    chmod +x /tmp/monitor.sh
+    /tmp/monitor.sh
+
+    echo "Configuring Nginx Reverse Proxy for SSE..."
+    if ! command -v nginx &> /dev/null; then
+        apt-get update && apt-get install -y nginx
+    fi
+
+    # Create Nginx config for SSE
+    cat << 'NGINXEOF' > /etc/nginx/sites-available/vps-monitor
+server {
+    listen 443 ssl;
+    server_name _;
+
+    ssl_certificate /etc/zivpn/zivpn.crt;
+    ssl_certificate_key /etc/zivpn/zivpn.key;
+
+    location /api/monitoring/stream {
+        proxy_pass http://127.0.0.1:5890;
+        proxy_http_version 1.1;
+        proxy_set_header Connection '';
+        proxy_set_header Host $host;
+        proxy_cache off;
+        proxy_buffering off;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+        chunked_transfer_encoding on;
+    }
+}
+NGINXEOF
+
+    ln -sf /etc/nginx/sites-available/vps-monitor /etc/nginx/sites-enabled/
+
+    # Open port 443 if ufw is active
+    if command -v ufw &> /dev/null && ufw status | grep -q "Status: active"; then
+        ufw allow 443/tcp
+    fi
+
+    systemctl restart nginx
+
+    echo -e "${LIGHT_GREEN}Monitor SSE dan Nginx Reverse Proxy berhasil diinstal!${NC}"
+    echo -e "Endpoint SSE: ${CYAN}https://$(get_public_ip)/api/monitoring/stream${NC}"
+    read -p "Tekan Enter untuk kembali ke menu..."
+}
+
 function show_menu() {
     if [ -f "/etc/zivpn/.expired" ]; then
         show_expired_message_and_exit
@@ -874,11 +926,12 @@ function show_menu() {
     echo -e "${YELLOW}║   ${RED}6)${NC} ${BOLD_WHITE}Backup/Restore                                ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}7)${NC} ${BOLD_WHITE}Generate API Auth Key                         ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}8)${NC} ${BOLD_WHITE}Pengaturan BadVPN                             ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}9)${NC} ${BOLD_WHITE}Install Monitor SSE                           ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Exit                                          ${YELLOW}║${NC}"
     echo -e "${YELLOW}║                                                    ║${NC}"
     echo -e "${YELLOW}╚════════════════════════════════════════════════════╝${NC}"
     
-    read -p "Enter your choice [0-8]: " choice
+    read -p "Enter your choice [0-9]: " choice
 
     case $choice in
         1) create_account ;;
@@ -889,6 +942,7 @@ function show_menu() {
         6) show_backup_menu ;;
         7) _generate_api_key ;;
         8) manage_badvpn ;;
+        9) install_monitor ;;
         0) exit 0 ;;
         *) echo "Invalid option. Please try again." ;;
     esac
