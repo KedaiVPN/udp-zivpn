@@ -495,22 +495,148 @@ function delete_account() {
     read -p "Tekan Enter untuk kembali ke menu..."
 }
 
-function change_domain() {
+
+function _setup_self_signed_ssl() {
+    local domain=$1
+    echo "Generating Self-Signed certificate for domain '${domain}'..."
+    openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
+        -subj "/C=US/ST=California/L=Los Angeles/O=Example Corp/OU=IT Department/CN=${domain}" \
+        -keyout "/etc/zivpn/zivpn.key" -out "/etc/zivpn/zivpn.crt" 2>/dev/null
+    echo "Self-Signed certificate generated."
+}
+
+function _setup_official_ssl() {
+    local domain=$1
+    echo "Installing official SSL (Let's Encrypt) for domain '${domain}'..."
+    if ! command -v certbot &> /dev/null; then
+        apt-get update && apt-get install -y certbot
+    fi
+
+    if systemctl is-active --quiet nginx; then
+        if ! dpkg -l | grep -q python3-certbot-nginx; then
+            apt-get install -y python3-certbot-nginx
+        fi
+        certbot certonly --nginx -d "$domain" --non-interactive --agree-tos -m admin@"$domain"
+    else
+        # Stop anything on port 80 just in case
+        systemctl stop apache2 2>/dev/null || true
+        certbot certonly --standalone -d "$domain" --non-interactive --agree-tos -m admin@"$domain"
+    fi
+
+    if [ $? -eq 0 ]; then
+        echo "Official SSL generated successfully. Copying to Zivpn directory..."
+        cp "/etc/letsencrypt/live/${domain}/fullchain.pem" "/etc/zivpn/zivpn.crt"
+        cp "/etc/letsencrypt/live/${domain}/privkey.pem" "/etc/zivpn/zivpn.key"
+        echo "$domain" > /etc/zivpn/.official_domain
+    else
+        echo -e "${RED}Failed to generate official SSL. Please ensure domain points to this IP and port 80 is open.${NC}"
+    fi
+}
+
+function _change_domain_submenu() {
     echo "--- Change Domain ---"
-    read -p "Enter the new domain name for the SSL certificate: " domain
+    read -p "Masukkan domain baru: " domain
     if [ -z "$domain" ]; then
-        echo "Domain name cannot be empty."
+        echo "Domain tidak boleh kosong."
         return
     fi
 
-    echo "Generating new certificate for domain '${domain}'..."
-    openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
-        -subj "/C=US/ST=California/L=Los Angeles/O=Example Corp/OU=IT Department/CN=${domain}" \
-        -keyout "/etc/zivpn/zivpn.key" -out "/etc/zivpn/zivpn.crt"
+    echo -e "1. Pasang SSL self-signed"
+    echo -e "2. Pasang SSL resmi"
+    echo -e "3. Pasang kedua SSL"
+    read -p "Pilih [1-3]: " ssl_choice
 
-    echo "New certificate generated."
+    case $ssl_choice in
+        1)
+            _setup_self_signed_ssl "$domain"
+            ;;
+        2)
+            _setup_official_ssl "$domain"
+            ;;
+        3)
+            echo "Memasang Self-Signed SSL..."
+            _setup_self_signed_ssl "$domain"
+            echo "Menambahkan SSL Resmi (Let's Encrypt) yang akan menimpa Self-Signed SSL..."
+            _setup_official_ssl "$domain"
+            ;;
+        *)
+            echo "Pilihan tidak valid."
+            return
+            ;;
+    esac
+
     restart_zivpn
+    read -p "Tekan Enter untuk kembali..."
 }
+
+function _renew_certificates() {
+    echo "--- Renew Sertifikat ---"
+    if [ ! -f "/etc/zivpn/zivpn.crt" ]; then
+        echo "Sertifikat tidak ditemukan."
+        read -p "Tekan Enter untuk kembali..."
+        return
+    fi
+
+    local ISSUER
+    ISSUER=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -issuer 2>/dev/null)
+    local CERT_CN
+    CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject 2>/dev/null | sed -n 's/.*CN = \([^,]*\).*/\1/p' | xargs)
+
+    # Let's Encrypt certificates usually have Let's Encrypt or R3 or E1 in the issuer
+    if [[ "$ISSUER" == *"Let's Encrypt"* || "$ISSUER" == *"R3"* || "$ISSUER" == *"E1"* ]]; then
+        echo "Mendeteksi SSL Resmi (Let's Encrypt) untuk domain $CERT_CN."
+        echo "Melakukan pembaruan (renew) SSL resmi..."
+        if command -v certbot &> /dev/null; then
+            certbot renew
+            if [ -f "/etc/letsencrypt/live/${CERT_CN}/fullchain.pem" ]; then
+                cp "/etc/letsencrypt/live/${CERT_CN}/fullchain.pem" "/etc/zivpn/zivpn.crt"
+                cp "/etc/letsencrypt/live/${CERT_CN}/privkey.pem" "/etc/zivpn/zivpn.key"
+                echo "Sertifikat SSL resmi berhasil diperbarui."
+            fi
+        else
+            echo "Certbot tidak terinstall. Tidak bisa memperbarui SSL resmi."
+        fi
+    elif [[ "$ISSUER" == *"Example Corp"* || "$ISSUER" == *"$CERT_CN"* ]]; then
+        echo "Mendeteksi SSL Self-Signed untuk domain $CERT_CN."
+        echo "Memperbarui (regenerate) SSL self-signed..."
+        _setup_self_signed_ssl "$CERT_CN"
+    else
+        echo "Mendeteksi sertifikat kustom. Mencoba memperbarui..."
+        if [ -d "/etc/letsencrypt/live/${CERT_CN}" ]; then
+             certbot renew
+             cp "/etc/letsencrypt/live/${CERT_CN}/fullchain.pem" "/etc/zivpn/zivpn.crt"
+             cp "/etc/letsencrypt/live/${CERT_CN}/privkey.pem" "/etc/zivpn/zivpn.key"
+             echo "Sertifikat SSL resmi berhasil diperbarui."
+        else
+             _setup_self_signed_ssl "$CERT_CN"
+        fi
+    fi
+
+    restart_zivpn
+    read -p "Tekan Enter untuk kembali..."
+}
+
+function domain_management() {
+    while true; do
+        clear
+        echo -e "${YELLOW}╔════════════════// ${RED}Domain Management${YELLOW} //════════════════╗${NC}"
+        echo -e "${YELLOW}║                                                    ║${NC}"
+        echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Change Domain                                 ${YELLOW}║${NC}"
+        echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Renew Sertifikat                              ${YELLOW}║${NC}"
+        echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Kembali ke Menu Utama                         ${YELLOW}║${NC}"
+        echo -e "${YELLOW}║                                                    ║${NC}"
+        echo -e "${YELLOW}╚════════════════════════════════════════════════════╝${NC}"
+
+        read -p "Pilih menu [0-2]: " choice
+        case $choice in
+            1) _change_domain_submenu ;;
+            2) _renew_certificates ;;
+            0) return ;;
+            *) echo "Pilihan tidak valid."; sleep 1 ;;
+        esac
+    done
+}
+
 
 function _display_accounts() {
     local db_file="/etc/zivpn/users.db"
@@ -854,29 +980,36 @@ function show_expired_message_and_exit() {
     exit 0
 }
 
-
 function install_monitor() {
     clear
     echo -e "${YELLOW}╔════════════════// ${RED}Install Monitor SSE${YELLOW} //════════════════╗${NC}"
-    echo "Downloading and installing VPS Monitor SSE..."
 
+    # Meminta input domain untuk Let's Encrypt
+    read -p "Masukkan domain yang sudah di-pointing ke IP server ini (misal: monitor.domain.com): " domain_name
+    if [ -z "$domain_name" ]; then
+        echo "Domain tidak boleh kosong! Batal menginstal monitor."
+        read -p "Tekan Enter untuk kembali ke menu..."
+        return
+    fi
+
+    echo "Downloading and installing VPS Monitor SSE..."
     wget -q -O /tmp/monitor.sh "https://raw.githubusercontent.com/KedaiVPN/kemed/main/monitor.sh"
     chmod +x /tmp/monitor.sh
     /tmp/monitor.sh
 
-    echo "Configuring Nginx Reverse Proxy for SSE..."
+    echo "Configuring Nginx and Certbot for SSE..."
     if ! command -v nginx &> /dev/null; then
         apt-get update && apt-get install -y nginx
     fi
+    if ! command -v certbot &> /dev/null; then
+        apt-get install -y certbot python3-certbot-nginx
+    fi
 
-    # Create Nginx config for SSE
+    # Create Nginx config for SSE on Port 80 (Certbot will handle the HTTPS upgrade)
     cat << 'NGINXEOF' > /etc/nginx/sites-available/vps-monitor
 server {
-    listen 443 ssl;
-    server_name _;
-
-    ssl_certificate /etc/zivpn/zivpn.crt;
-    ssl_certificate_key /etc/zivpn/zivpn.key;
+    listen 80;
+    server_name SERVER_DOMAIN_PLACEHOLDER;
 
     location /api/monitoring/stream {
         proxy_pass http://127.0.0.1:5890;
@@ -892,17 +1025,31 @@ server {
 }
 NGINXEOF
 
-    ln -sf /etc/nginx/sites-available/vps-monitor /etc/nginx/sites-enabled/
+    # Replace the placeholder with the actual variable
+    sed -i "s/SERVER_DOMAIN_PLACEHOLDER/$domain_name/g" /etc/nginx/sites-available/vps-monitor
 
-    # Open port 443 if ufw is active
+    ln -sf /etc/nginx/sites-available/vps-monitor /etc/nginx/sites-enabled/
+    rm -f /etc/nginx/sites-enabled/default
+
+    # Open port 80 and 443 if ufw is active
     if command -v ufw &> /dev/null && ufw status | grep -q "Status: active"; then
+        ufw allow 80/tcp
         ufw allow 443/tcp
     fi
 
     systemctl restart nginx
 
-    echo -e "${LIGHT_GREEN}Monitor SSE dan Nginx Reverse Proxy berhasil diinstal!${NC}"
-    echo -e "Endpoint SSE: ${CYAN}https://$(get_public_ip)/api/monitoring/stream${NC}"
+    echo "Mengambil sertifikat SSL resmi menggunakan Certbot untuk $domain_name..."
+    certbot --nginx -d "$domain_name" --non-interactive --agree-tos -m admin@"$domain_name" --redirect
+
+    if [ $? -eq 0 ]; then
+        echo -e "${LIGHT_GREEN}Monitor SSE, Nginx, dan SSL (Let's Encrypt) berhasil diinstal!${NC}"
+        echo -e "Endpoint SSE: ${CYAN}https://${domain_name}/api/monitoring/stream${NC}"
+    else
+        echo -e "${RED}Gagal mendapatkan sertifikat SSL. Pastikan domain sudah pointing ke IP server dan port 80 terbuka.${NC}"
+        echo -e "Endpoint SSE mungkin hanya dapat diakses melalui HTTP: http://${domain_name}/api/monitoring/stream"
+    fi
+
     read -p "Tekan Enter untuk kembali ke menu..."
 }
 
@@ -921,7 +1068,7 @@ function show_menu() {
     echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Create Account                                ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Renew Account                                 ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}3)${NC} ${BOLD_WHITE}Delete Account                                ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║   ${RED}4)${NC} ${BOLD_WHITE}Change Domain                                 ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}4)${NC} ${BOLD_WHITE}Domain Management                             ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}5)${NC} ${BOLD_WHITE}List Accounts                                 ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}6)${NC} ${BOLD_WHITE}Backup/Restore                                ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}7)${NC} ${BOLD_WHITE}Generate API Auth Key                         ${YELLOW}║${NC}"
@@ -937,7 +1084,7 @@ function show_menu() {
         1) create_account ;;
         2) renew_account ;;
         3) delete_account ;;
-        4) change_domain ;;
+        4) domain_management ;;
         5) list_accounts ;;
         6) show_backup_menu ;;
         7) _generate_api_key ;;
