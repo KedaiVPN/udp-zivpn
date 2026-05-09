@@ -505,136 +505,18 @@ function _setup_self_signed_ssl() {
     echo "Self-Signed certificate generated."
 }
 
-function _setup_official_ssl() {
-    local domain=$1
-    echo "Installing official SSL (Let's Encrypt) for domain '${domain}'..."
-    if ! command -v certbot &> /dev/null; then
-        apt-get update && apt-get install -y certbot
-    fi
-
-    if systemctl is-active --quiet nginx; then
-        if ! dpkg -l | grep -q python3-certbot-nginx; then
-            apt-get install -y python3-certbot-nginx
-        fi
-        certbot certonly --nginx -d "$domain" --non-interactive --agree-tos -m admin@"$domain"
-    else
-        # Stop anything on port 80 just in case
-        systemctl stop apache2 2>/dev/null || true
-        certbot certonly --standalone -d "$domain" --non-interactive --agree-tos -m admin@"$domain"
-    fi
-
-    if [ $? -eq 0 ]; then
-        echo "Official SSL generated successfully. Copying to Zivpn directory..."
-        cp "/etc/letsencrypt/live/${domain}/fullchain.pem" "/etc/zivpn/zivpn.crt"
-        cp "/etc/letsencrypt/live/${domain}/privkey.pem" "/etc/zivpn/zivpn.key"
-        echo "$domain" > /etc/zivpn/.official_domain
-    else
-        echo -e "${RED}Failed to generate official SSL. Please ensure domain points to this IP and port 80 is open.${NC}"
-    fi
-}
-
-function _change_domain_submenu() {
-    echo "--- Change Domain ---"
+function domain_management() {
+    clear
+    echo "--- Tambahkan Domain ---"
     read -p "Masukkan domain baru: " domain
     if [ -z "$domain" ]; then
         echo "Domain tidak boleh kosong."
+        sleep 1
         return
     fi
-
-    echo -e "1. Pasang SSL self-signed"
-    echo -e "2. Pasang SSL resmi"
-    echo -e "3. Pasang kedua SSL"
-    read -p "Pilih [1-3]: " ssl_choice
-
-    case $ssl_choice in
-        1)
-            _setup_self_signed_ssl "$domain"
-            ;;
-        2)
-            _setup_official_ssl "$domain"
-            ;;
-        3)
-            echo "Memasang Self-Signed SSL..."
-            _setup_self_signed_ssl "$domain"
-            echo "Menambahkan SSL Resmi (Let's Encrypt) yang akan menimpa Self-Signed SSL..."
-            _setup_official_ssl "$domain"
-            ;;
-        *)
-            echo "Pilihan tidak valid."
-            return
-            ;;
-    esac
-
+    _setup_self_signed_ssl "$domain"
     restart_zivpn
     read -p "Tekan Enter untuk kembali..."
-}
-
-function _renew_certificates() {
-    echo "--- Renew Sertifikat ---"
-    if [ ! -f "/etc/zivpn/zivpn.crt" ]; then
-        echo "Sertifikat tidak ditemukan."
-        read -p "Tekan Enter untuk kembali..."
-        return
-    fi
-
-    local ISSUER
-    ISSUER=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -issuer 2>/dev/null)
-    local CERT_CN
-    CERT_CN=$(openssl x509 -in /etc/zivpn/zivpn.crt -noout -subject 2>/dev/null | sed -n 's/.*CN = \([^,]*\).*/\1/p' | xargs)
-
-    # Let's Encrypt certificates usually have Let's Encrypt or R3 or E1 in the issuer
-    if [[ "$ISSUER" == *"Let's Encrypt"* || "$ISSUER" == *"R3"* || "$ISSUER" == *"E1"* ]]; then
-        echo "Mendeteksi SSL Resmi (Let's Encrypt) untuk domain $CERT_CN."
-        echo "Melakukan pembaruan (renew) SSL resmi..."
-        if command -v certbot &> /dev/null; then
-            certbot renew
-            if [ -f "/etc/letsencrypt/live/${CERT_CN}/fullchain.pem" ]; then
-                cp "/etc/letsencrypt/live/${CERT_CN}/fullchain.pem" "/etc/zivpn/zivpn.crt"
-                cp "/etc/letsencrypt/live/${CERT_CN}/privkey.pem" "/etc/zivpn/zivpn.key"
-                echo "Sertifikat SSL resmi berhasil diperbarui."
-            fi
-        else
-            echo "Certbot tidak terinstall. Tidak bisa memperbarui SSL resmi."
-        fi
-    elif [[ "$ISSUER" == *"Example Corp"* || "$ISSUER" == *"$CERT_CN"* ]]; then
-        echo "Mendeteksi SSL Self-Signed untuk domain $CERT_CN."
-        echo "Memperbarui (regenerate) SSL self-signed..."
-        _setup_self_signed_ssl "$CERT_CN"
-    else
-        echo "Mendeteksi sertifikat kustom. Mencoba memperbarui..."
-        if [ -d "/etc/letsencrypt/live/${CERT_CN}" ]; then
-             certbot renew
-             cp "/etc/letsencrypt/live/${CERT_CN}/fullchain.pem" "/etc/zivpn/zivpn.crt"
-             cp "/etc/letsencrypt/live/${CERT_CN}/privkey.pem" "/etc/zivpn/zivpn.key"
-             echo "Sertifikat SSL resmi berhasil diperbarui."
-        else
-             _setup_self_signed_ssl "$CERT_CN"
-        fi
-    fi
-
-    restart_zivpn
-    read -p "Tekan Enter untuk kembali..."
-}
-
-function domain_management() {
-    while true; do
-        clear
-        echo -e "${YELLOW}╔════════════════// ${RED}Domain Management${YELLOW} //════════════════╗${NC}"
-        echo -e "${YELLOW}║                                                    ║${NC}"
-        echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Change Domain                                 ${YELLOW}║${NC}"
-        echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Renew Sertifikat                              ${YELLOW}║${NC}"
-        echo -e "${YELLOW}║   ${RED}0)${NC} ${BOLD_WHITE}Kembali ke Menu Utama                         ${YELLOW}║${NC}"
-        echo -e "${YELLOW}║                                                    ║${NC}"
-        echo -e "${YELLOW}╚════════════════════════════════════════════════════╝${NC}"
-
-        read -p "Pilih menu [0-2]: " choice
-        case $choice in
-            1) _change_domain_submenu ;;
-            2) _renew_certificates ;;
-            0) return ;;
-            *) echo "Pilihan tidak valid."; sleep 1 ;;
-        esac
-    done
 }
 
 
@@ -1068,7 +950,7 @@ function show_menu() {
     echo -e "${YELLOW}║   ${RED}1)${NC} ${BOLD_WHITE}Create Account                                ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}2)${NC} ${BOLD_WHITE}Renew Account                                 ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}3)${NC} ${BOLD_WHITE}Delete Account                                ${YELLOW}║${NC}"
-    echo -e "${YELLOW}║   ${RED}4)${NC} ${BOLD_WHITE}Domain Management                             ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║   ${RED}4)${NC} ${BOLD_WHITE}Tambahkan domain                              ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}5)${NC} ${BOLD_WHITE}List Accounts                                 ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}6)${NC} ${BOLD_WHITE}Backup/Restore                                ${YELLOW}║${NC}"
     echo -e "${YELLOW}║   ${RED}7)${NC} ${BOLD_WHITE}Generate API Auth Key                         ${YELLOW}║${NC}"
