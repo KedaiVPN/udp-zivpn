@@ -145,6 +145,14 @@ function _create_account_api_logic() {
     jq --arg pass "$password" '.auth.config += [$pass]' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
 
     if [ $? -eq 0 ]; then
+        # Synchronize with Linux user (SocksIP)
+        local valid_date
+        valid_date=$(date '+%Y-%m-%d' -d "+$days days")
+        local crypt_pass
+        crypt_pass=$(openssl passwd -1 "$password")
+        # Do not fail if useradd fails, but attempt it
+        useradd -M -s /bin/false -e "${valid_date}" -K PASS_MAX_DAYS="${days}" -p "${crypt_pass}" -c "$password,$password" "$password" &>/dev/null
+
         # IMPORTANT: The success message now returns the *new* full password
         echo "Success: Account '${password_base}' created with password '${password}', expires in ${days} days."
         restart_zivpn
@@ -185,6 +193,13 @@ function _create_account_logic() {
     jq --arg pass "$password" '.auth.config += [$pass]' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
     
     if [ $? -eq 0 ]; then
+        # Synchronize with Linux user (SocksIP)
+        local valid_date
+        valid_date=$(date '+%Y-%m-%d' -d "+$days days")
+        local crypt_pass
+        crypt_pass=$(openssl passwd -1 "$password")
+        useradd -M -s /bin/false -e "${valid_date}" -K PASS_MAX_DAYS="${days}" -p "${crypt_pass}" -c "$password,$password" "$password" &>/dev/null
+
         echo "Success: Account '${password}' created, expires in ${days} days."
         restart_zivpn
         return 0
@@ -305,6 +320,13 @@ function _create_trial_account_logic() {
     jq --arg pass "$password" '.auth.config += [$pass]' /etc/zivpn/config.json > /etc/zivpn/config.json.tmp && mv /etc/zivpn/config.json.tmp /etc/zivpn/config.json
     
     if [ $? -eq 0 ]; then
+        # Synchronize with Linux user (SocksIP) - valid for 1 day for trial
+        local valid_date
+        valid_date=$(date '+%Y-%m-%d' -d "+1 days")
+        local crypt_pass
+        crypt_pass=$(openssl passwd -1 "$password")
+        useradd -M -s /bin/false -e "${valid_date}" -K PASS_MAX_DAYS=1 -p "${crypt_pass}" -c "$password,$password" "$password" &>/dev/null
+
         echo "Success: Trial account '${password}' created, expires in ${minutes} minutes."
         restart_zivpn
         return 0
@@ -401,6 +423,12 @@ function _renew_account_logic() {
     local new_expiry_date=$((current_expiry_date + seconds_to_add))
     
     sed -i "s/^${password}:.*/${password}:${new_expiry_date}/" "$db_file"
+
+    # Synchronize with Linux user (SocksIP)
+    local valid_date
+    valid_date=$(date '+%Y-%m-%d' -d "@$new_expiry_date")
+    chage -E "$valid_date" "$password" &>/dev/null
+
     echo "Success: Account '${password}' has been renewed for ${days} days."
     return 0
 }
@@ -466,6 +494,10 @@ function _delete_account_logic() {
         # Step 3: Atomically replace the old config with the new one
         mv "$tmp_config_file" "$config_file"
         
+        # Synchronize with Linux user (SocksIP)
+        pkill -u "$password" &>/dev/null
+        userdel --force "$password" &>/dev/null
+
         echo "Success: Account '${password}' deleted."
         restart_zivpn
         return 0
@@ -1061,6 +1093,11 @@ while IFS=':' read -r password expiry_date; do
     if [ "$expiry_date" -le "$CURRENT_DATE" ]; then
         echo "User '${password}' has expired. Deleting permanently."
         jq --arg pass "$password" 'del(.auth.config[] | select(. == $pass))' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+
+        # Synchronize with Linux user (SocksIP)
+        pkill -u "$password" &>/dev/null
+        userdel --force "$password" &>/dev/null
+
         SERVICE_RESTART_NEEDED=true
     else
         echo "${password}:${expiry_date}" >> "$TMP_DB_FILE"
@@ -1284,6 +1321,47 @@ EOF
         else
             echo "--- BadVPN UDPGW Setup Complete ---"
         fi
+    fi
+
+    # --- SocksIP (udpServer) Setup ---
+    echo "--- Setting up SocksIP (udpServer) ---"
+
+    echo "Downloading udpServer binary..."
+    if wget -O /usr/bin/udpServer 'https://raw.githubusercontent.com/KedaiVPN/SocksIP/main/udpServer' &>/dev/null; then
+        chmod +x /usr/bin/udpServer
+        echo "udpServer binary downloaded successfully."
+
+        local ip_publica
+        ip_publica=$(get_public_ip)
+        local interfas
+        interfas=$(ip -o -4 route show to default | awk '{print $5}' | head -n 1)
+        # Choose a port that doesn't conflict, e.g., 36712
+        local port_socksip="36712"
+
+        cat <<EOF > /etc/systemd/system/UDPserver.service
+[Unit]
+Description=UDPserver Service (SocksIP)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root
+ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas}${port_socksip} -mode=system
+Restart=always
+RestartSec=3s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+        systemctl daemon-reload
+        systemctl enable UDPserver
+        systemctl start UDPserver
+        echo "SocksIP (udpServer) service created and started."
+    else
+        echo "Failed to download udpServer binary. Skipping SocksIP setup."
+        rm -rf /usr/bin/udpServer
     fi
 
     # --- API Setup ---
