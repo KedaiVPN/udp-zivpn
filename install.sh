@@ -1335,8 +1335,6 @@ EOF
         ip_publica=$(get_public_ip)
         local interfas
         interfas=$(ip -o -4 route show to default | awk '{print $5}' | head -n 1)
-        # Choose a port that doesn't conflict, e.g., 36712
-        local port_socksip="36712"
 
         cat <<EOF > /etc/systemd/system/UDPserver.service
 [Unit]
@@ -1347,7 +1345,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/root
-ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas}${port_socksip} -mode=system
+ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas} -mode=system
 Restart=always
 RestartSec=3s
 
