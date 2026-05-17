@@ -387,7 +387,10 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/root
-ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas} -listen=:8989
+ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas} -mode=system
+ExecStartPost=/bin/sleep 2
+ExecStartPost=-/sbin/iptables -t nat -D PREROUTING -i ${interfas} -p udp -m udp --dport 8990:65535 -j REDIRECT --to-ports 8989
+ExecStartPost=-/sbin/iptables -t nat -D PREROUTING -i ${interfas} -p udp -m udp --dport 1:8988 -j REDIRECT --to-ports 8989
 Restart=always
 RestartSec=3s
 
