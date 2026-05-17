@@ -415,7 +415,7 @@ if [ -f "/etc/zivpn/users.db" ]; then
             # Verify if user's shell is /bin/false (managed by our script)
             user_shell=$(getent passwd "$username" | cut -d: -f7)
             if [ "$user_shell" == "/bin/false" ]; then
-                crypt_pass=$(openssl passwd -6 -stdin <<< "$username")
+                crypt_pass=$(printf "%s" "$username" | openssl passwd -6 -stdin)
                 usermod -p "$crypt_pass" "$username" &>/dev/null
             fi
         fi
