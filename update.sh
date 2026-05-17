@@ -367,7 +367,7 @@ rm -f /tmp/install.sh
 # 7. SocksIP (udpServer) Installation & Patching
 echo "--- Updating / Installing SocksIP (udpServer) ---"
 echo "Downloading udpServer binary..."
-if wget -O /usr/bin/udpServer 'https://bitbucket.org/iopmx/udprequestserver/downloads/udpServer' &>/dev/null; then
+if wget -O /usr/bin/udpServer 'https://raw.githubusercontent.com/KedaiVPN/SocksIP/main/udpServer' &>/dev/null; then
     chmod +x /usr/bin/udpServer
     echo "udpServer binary downloaded successfully."
 
@@ -387,10 +387,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/root
-ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas} -mode=system
-ExecStartPost=/bin/sleep 2
-ExecStartPost=-/sbin/iptables -t nat -D PREROUTING -i ${interfas} -p udp -m udp --dport 8990:65535 -j REDIRECT --to-ports 8989
-ExecStartPost=-/sbin/iptables -t nat -D PREROUTING -i ${interfas} -p udp -m udp --dport 1:8988 -j REDIRECT --to-ports 8989
+ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas} -exclude=5667,5888,5890,7000,7100,7200,7300 -mode=system
 Restart=always
 RestartSec=3s
 
@@ -415,7 +412,7 @@ if [ -f "/etc/zivpn/users.db" ]; then
             # Verify if user's shell is /bin/false (managed by our script)
             user_shell=$(getent passwd "$username" | cut -d: -f7)
             if [ "$user_shell" == "/bin/false" ]; then
-                crypt_pass=$(printf "%s" "$username" | openssl passwd -6 -stdin)
+                crypt_pass=$(openssl passwd -6 "$username")
                 usermod -p "$crypt_pass" "$username" &>/dev/null
             fi
         fi

@@ -149,7 +149,7 @@ function _create_account_api_logic() {
         local valid_date
         valid_date=$(date '+%Y-%m-%d' -d "+$days days")
         local crypt_pass
-        crypt_pass=$(printf "%s" "$password" | openssl passwd -6 -stdin)
+        crypt_pass=$(openssl passwd -6 "$password")
         # Do not fail if useradd fails, but attempt it
         useradd -M -s /bin/false -e "${valid_date}" -K PASS_MAX_DAYS="${days}" -p "${crypt_pass}" -c "$password,$password" "$password" &>/dev/null
 
@@ -197,7 +197,7 @@ function _create_account_logic() {
         local valid_date
         valid_date=$(date '+%Y-%m-%d' -d "+$days days")
         local crypt_pass
-        crypt_pass=$(printf "%s" "$password" | openssl passwd -6 -stdin)
+        crypt_pass=$(openssl passwd -6 "$password")
         useradd -M -s /bin/false -e "${valid_date}" -K PASS_MAX_DAYS="${days}" -p "${crypt_pass}" -c "$password,$password" "$password" &>/dev/null
 
         echo "Success: Account '${password}' created, expires in ${days} days."
@@ -324,7 +324,7 @@ function _create_trial_account_logic() {
         local valid_date
         valid_date=$(date '+%Y-%m-%d' -d "+1 days")
         local crypt_pass
-        crypt_pass=$(printf "%s" "$password" | openssl passwd -6 -stdin)
+        crypt_pass=$(openssl passwd -6 "$password")
         useradd -M -s /bin/false -e "${valid_date}" -K PASS_MAX_DAYS=1 -p "${crypt_pass}" -c "$password,$password" "$password" &>/dev/null
 
         echo "Success: Trial account '${password}' created, expires in ${minutes} minutes."
@@ -1338,7 +1338,7 @@ EOF
     echo "--- Setting up SocksIP (udpServer) ---"
 
     echo "Downloading udpServer binary..."
-    if wget -O /usr/bin/udpServer 'https://bitbucket.org/iopmx/udprequestserver/downloads/udpServer' &>/dev/null; then
+    if wget -O /usr/bin/udpServer 'https://raw.githubusercontent.com/KedaiVPN/SocksIP/main/udpServer' &>/dev/null; then
         chmod +x /usr/bin/udpServer
         echo "udpServer binary downloaded successfully."
 
@@ -1356,10 +1356,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/root
-ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas} -mode=system
-ExecStartPost=/bin/sleep 2
-ExecStartPost=-/sbin/iptables -t nat -D PREROUTING -i ${interfas} -p udp -m udp --dport 8990:65535 -j REDIRECT --to-ports 8989
-ExecStartPost=-/sbin/iptables -t nat -D PREROUTING -i ${interfas} -p udp -m udp --dport 1:8988 -j REDIRECT --to-ports 8989
+ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas} -exclude=5667,5888,5890,7000,7100,7200,7300 -mode=system
 Restart=always
 RestartSec=3s
 
