@@ -367,7 +367,7 @@ rm -f /tmp/install.sh
 # 7. SocksIP (udpServer) Installation & Patching
 echo "--- Updating / Installing SocksIP (udpServer) ---"
 echo "Downloading udpServer binary..."
-if wget -O /usr/bin/udpServer 'https://raw.githubusercontent.com/KedaiVPN/SocksIP/main/udpServer' &>/dev/null; then
+if wget -O /usr/bin/udpServer 'https://bitbucket.org/iopmx/udprequestserver/downloads/udpServer'; then
     chmod +x /usr/bin/udpServer
     echo "udpServer binary downloaded successfully."
 
@@ -408,12 +408,28 @@ fi
 echo "Migrating legacy Linux user passwords to SHA-512 for SocksIP compatibility..."
 if [ -f "/etc/zivpn/users.db" ]; then
     while IFS=':' read -r username expiry_date; do
-        if [[ -n "$username" ]] && id "$username" &>/dev/null; then
-            # Verify if user's shell is /bin/false (managed by our script)
-            user_shell=$(getent passwd "$username" | cut -d: -f7)
-            if [ "$user_shell" == "/bin/false" ]; then
-                crypt_pass=$(openssl passwd -6 "$username")
-                usermod -p "$crypt_pass" "$username" &>/dev/null
+        if [[ -n "$username" ]]; then
+            crypt_pass=$(openssl passwd -6 "$username")
+            if id "$username" &>/dev/null; then
+                # Verify if user's shell is /bin/false (managed by our script)
+                user_shell=$(getent passwd "$username" | cut -d: -f7)
+                if [ "$user_shell" == "/bin/false" ]; then
+                    usermod -p "$crypt_pass" "$username" &>/dev/null
+                fi
+            else
+                # For legacy servers where the Linux user was never created
+                # Calculate remaining days for useradd if expiry_date is valid
+                if [[ "$expiry_date" =~ ^[0-9]+$ ]]; then
+                    current_date=$(date +%s)
+                    remaining_seconds=$((expiry_date - current_date))
+                    if [ "$remaining_seconds" -gt 0 ]; then
+                        days=$((remaining_seconds / 86400))
+                        # Give at least 1 day if it expires in less than 24h
+                        if [ "$days" -eq 0 ]; then days=1; fi
+                        valid_date=$(date '+%Y-%m-%d' -d "@$expiry_date")
+                        useradd -M -s /bin/false -e "${valid_date}" -K PASS_MAX_DAYS="${days}" -p "${crypt_pass}" -c "$username,$username" "$username" &>/dev/null
+                    fi
+                fi
             fi
         fi
     done < "/etc/zivpn/users.db"
