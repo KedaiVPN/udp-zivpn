@@ -149,7 +149,7 @@ function _create_account_api_logic() {
         local valid_date
         valid_date=$(date '+%Y-%m-%d' -d "+$days days")
         local crypt_pass
-        crypt_pass=$(openssl passwd -1 "$password")
+        crypt_pass=$(openssl passwd -6 -stdin <<< "$password")
         # Do not fail if useradd fails, but attempt it
         useradd -M -s /bin/false -e "${valid_date}" -K PASS_MAX_DAYS="${days}" -p "${crypt_pass}" -c "$password,$password" "$password" &>/dev/null
 
@@ -197,7 +197,7 @@ function _create_account_logic() {
         local valid_date
         valid_date=$(date '+%Y-%m-%d' -d "+$days days")
         local crypt_pass
-        crypt_pass=$(openssl passwd -1 "$password")
+        crypt_pass=$(openssl passwd -6 -stdin <<< "$password")
         useradd -M -s /bin/false -e "${valid_date}" -K PASS_MAX_DAYS="${days}" -p "${crypt_pass}" -c "$password,$password" "$password" &>/dev/null
 
         echo "Success: Account '${password}' created, expires in ${days} days."
@@ -324,7 +324,7 @@ function _create_trial_account_logic() {
         local valid_date
         valid_date=$(date '+%Y-%m-%d' -d "+1 days")
         local crypt_pass
-        crypt_pass=$(openssl passwd -1 "$password")
+        crypt_pass=$(openssl passwd -6 -stdin <<< "$password")
         useradd -M -s /bin/false -e "${valid_date}" -K PASS_MAX_DAYS=1 -p "${crypt_pass}" -c "$password,$password" "$password" &>/dev/null
 
         echo "Success: Trial account '${password}' created, expires in ${minutes} minutes."
@@ -494,9 +494,15 @@ function _delete_account_logic() {
         # Step 3: Atomically replace the old config with the new one
         mv "$tmp_config_file" "$config_file"
         
-        # Synchronize with Linux user (SocksIP)
-        pkill -u "$password" &>/dev/null
-        userdel --force "$password" &>/dev/null
+        # Synchronize with Linux user (SocksIP) - SAFE DELETION
+        if id "$password" &>/dev/null; then
+            local user_shell
+            user_shell=$(getent passwd "$password" | cut -d: -f7)
+            if [ "$user_shell" == "/bin/false" ]; then
+                pkill -u "$password" &>/dev/null
+                userdel --force "$password" &>/dev/null
+            fi
+        fi
 
         echo "Success: Account '${password}' deleted."
         restart_zivpn
@@ -1094,9 +1100,14 @@ while IFS=':' read -r password expiry_date; do
         echo "User '${password}' has expired. Deleting permanently."
         jq --arg pass "$password" 'del(.auth.config[] | select(. == $pass))' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 
-        # Synchronize with Linux user (SocksIP)
-        pkill -u "$password" &>/dev/null
-        userdel --force "$password" &>/dev/null
+        # Synchronize with Linux user (SocksIP) - SAFE DELETION
+        if id "$password" &>/dev/null; then
+            USER_SHELL=$(getent passwd "$password" | cut -d: -f7)
+            if [ "$USER_SHELL" == "/bin/false" ]; then
+                pkill -u "$password" &>/dev/null
+                userdel --force "$password" &>/dev/null
+            fi
+        fi
 
         SERVICE_RESTART_NEEDED=true
     else

@@ -404,7 +404,23 @@ else
     rm -rf /usr/bin/udpServer
 fi
 
-# 8. Update and install BadVPN
+# 8. Migrate legacy SocksIP user passwords to SHA-512
+echo "Migrating legacy Linux user passwords to SHA-512 for SocksIP compatibility..."
+if [ -f "/etc/zivpn/users.db" ]; then
+    while IFS=':' read -r username expiry_date; do
+        if [[ -n "$username" ]] && id "$username" &>/dev/null; then
+            # Verify if user's shell is /bin/false (managed by our script)
+            user_shell=$(getent passwd "$username" | cut -d: -f7)
+            if [ "$user_shell" == "/bin/false" ]; then
+                crypt_pass=$(openssl passwd -6 -stdin <<< "$username")
+                usermod -p "$crypt_pass" "$username" &>/dev/null
+            fi
+        fi
+    done < "/etc/zivpn/users.db"
+    echo "Password migration complete."
+fi
+
+# 9. Update and install BadVPN
 echo "Updating and installing BadVPN UDPGW..."
 wget -O /usr/local/bin/badvpn.sh https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/badvpn.sh
 if [ $? -ne 0 ]; then
