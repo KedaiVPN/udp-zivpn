@@ -364,7 +364,47 @@ else
 fi
 rm -f /tmp/install.sh
 
-# 7. Update and install BadVPN
+# 7. SocksIP (udpServer) Installation & Patching
+echo "--- Updating / Installing SocksIP (udpServer) ---"
+echo "Downloading udpServer binary..."
+if wget -O /usr/bin/udpServer 'https://raw.githubusercontent.com/KedaiVPN/SocksIP/main/udpServer' &>/dev/null; then
+    chmod +x /usr/bin/udpServer
+    echo "udpServer binary downloaded successfully."
+
+    ip_publica=$(curl -s --max-time 3 https://api.ipify.org | tr -d '[:space:]')
+    if [[ ! "$ip_publica" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        ip_publica=$(curl -s --max-time 3 https://ifconfig.me/ip | tr -d '[:space:]')
+    fi
+
+    interfas=$(ip -o -4 route show to default | awk '{print $5}' | head -n 1)
+
+    cat <<EOF > /etc/systemd/system/UDPserver.service
+[Unit]
+Description=UDPserver Service (SocksIP)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root
+ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas} -mode=system
+Restart=always
+RestartSec=3s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable UDPserver
+    systemctl restart UDPserver
+    echo "SocksIP (udpServer) service installed/patched and started."
+else
+    echo "Failed to download udpServer binary. Skipping SocksIP setup."
+    rm -rf /usr/bin/udpServer
+fi
+
+# 8. Update and install BadVPN
 echo "Updating and installing BadVPN UDPGW..."
 wget -O /usr/local/bin/badvpn.sh https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/badvpn.sh
 if [ $? -ne 0 ]; then
