@@ -388,6 +388,9 @@ Type=simple
 User=root
 WorkingDirectory=/root
 ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas} -exclude=5667,5888,5890,7000,7100,7200,7300 -mode=system
+ExecStartPost=/bin/sleep 2
+ExecStartPost=-/sbin/iptables -t nat -I PREROUTING 1 -i ${interfas} -p udp --dport 5667 -j ACCEPT
+ExecStartPost=-/sbin/iptables -t nat -I PREROUTING 1 -i ${interfas} -p udp --dport 6000:19999 -j DNAT --to-destination :5667
 Restart=always
 RestartSec=3s
 
