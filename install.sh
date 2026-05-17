@@ -1356,7 +1356,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/root
-ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas} -mode=system
+ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas} -mode=system -exclude=5667,5888,5890,7000,7100,7200,7300
 Restart=always
 RestartSec=3s
 
