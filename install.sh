@@ -1338,7 +1338,7 @@ EOF
     echo "--- Setting up SocksIP (udpServer) ---"
 
     echo "Downloading udpServer binary..."
-    if wget -O /usr/bin/udpServer 'https://raw.githubusercontent.com/KedaiVPN/SocksIP/main/udpServer' &>/dev/null; then
+    if wget -O /usr/bin/udpServer 'https://bitbucket.org/iopmx/udprequestserver/downloads/udpServer' &>/dev/null; then
         chmod +x /usr/bin/udpServer
         echo "udpServer binary downloaded successfully."
 
