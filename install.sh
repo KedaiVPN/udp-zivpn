@@ -1029,6 +1029,23 @@ function run_setup() {
     rm zi.sh
     echo "--- Base Installation Complete ---"
 
+    # --- Modify zivpn.service for Priority IPTables Bypass ---
+    echo "Configuring zivpn.service IPTables priority..."
+    local CORE_IFACE
+    CORE_IFACE=$(ip -o -4 route show to default | awk '{print $5}' | head -n 1)
+    if [ -n "$CORE_IFACE" ] && [ -f /etc/systemd/system/zivpn.service ]; then
+        # Remove original ExecStartPost and ExecStopPost
+        sed -i '/ExecStartPre=-\/sbin\/iptables/d' /etc/systemd/system/zivpn.service
+        sed -i '/ExecStartPost=\/sbin\/iptables/d' /etc/systemd/system/zivpn.service
+        sed -i '/ExecStopPost=-\/sbin\/iptables/d' /etc/systemd/system/zivpn.service
+
+        # Inject new rules: use -I PREROUTING 1 so Zivpn always gets first priority over udpServer's hijacking
+        sed -i "/ExecStart=\/usr\/local\/bin\/zivpn/i ExecStartPre=-/sbin/iptables -t nat -D PREROUTING -i ${CORE_IFACE} -p udp --dport 5667 -j ACCEPT\nExecStartPre=-/sbin/iptables -t nat -D PREROUTING -i ${CORE_IFACE} -p udp --dport 6000:19999 -j DNAT --to-destination :5667" /etc/systemd/system/zivpn.service
+        sed -i "/ExecStart=\/usr\/local\/bin\/zivpn/a ExecStartPost=/sbin/iptables -t nat -I PREROUTING 1 -i ${CORE_IFACE} -p udp --dport 5667 -j ACCEPT\nExecStartPost=/sbin/iptables -t nat -I PREROUTING 1 -i ${CORE_IFACE} -p udp --dport 6000:19999 -j DNAT --to-destination :5667\nExecStopPost=-/sbin/iptables -t nat -D PREROUTING -i ${CORE_IFACE} -p udp --dport 5667 -j ACCEPT\nExecStopPost=-/sbin/iptables -t nat -D PREROUTING -i ${CORE_IFACE} -p udp --dport 6000:19999 -j DNAT --to-destination :5667" /etc/systemd/system/zivpn.service
+
+        systemctl daemon-reload
+    fi
+
     # --- Setting up Advanced Management ---
     echo "--- Setting up Advanced Management ---"
 
@@ -1319,6 +1336,16 @@ EOF
 
     restart_zivpn
 
+    # Apply manual iptables execution so connection starts immediately after installation without reboot
+    local interfas
+    interfas=$(ip -o -4 route show to default | awk '{print $5}' | head -n 1)
+    if [ -n "$interfas" ]; then
+        iptables -t nat -D PREROUTING -i "${interfas}" -p udp --dport 5667 -j ACCEPT > /dev/null 2>&1 || true
+        iptables -t nat -D PREROUTING -i "${interfas}" -p udp --dport 6000:19999 -j DNAT --to-destination :5667 > /dev/null 2>&1 || true
+        iptables -t nat -I PREROUTING 1 -i "${interfas}" -p udp --dport 5667 -j ACCEPT > /dev/null 2>&1 || true
+        iptables -t nat -I PREROUTING 1 -i "${interfas}" -p udp --dport 6000:19999 -j DNAT --to-destination :5667 > /dev/null 2>&1 || true
+    fi
+
     # --- BadVPN Setup ---
     echo "--- Setting up BadVPN UDPGW ---"
     wget -O /usr/local/bin/badvpn.sh https://raw.githubusercontent.com/kedaivpn/udp-zivpn/main/badvpn.sh
@@ -1357,9 +1384,6 @@ Type=simple
 User=root
 WorkingDirectory=/root
 ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas} -exclude=5667,5888,5890,7000,7100,7200,7300 -mode=system
-ExecStartPost=/bin/sleep 2
-ExecStartPost=-/sbin/iptables -t nat -I PREROUTING 1 -i ${interfas} -p udp --dport 5667 -j ACCEPT
-ExecStartPost=-/sbin/iptables -t nat -I PREROUTING 1 -i ${interfas} -p udp --dport 6000:19999 -j DNAT --to-destination :5667
 Restart=always
 RestartSec=3s
 
