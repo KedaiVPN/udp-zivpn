@@ -1141,6 +1141,23 @@ if [ "$SERVICE_RESTART_NEEDED" = true ]; then
     echo "Restarting zivpn service due to user removal."
     systemctl restart zivpn.service
 fi
+
+# INDEPENDENT CLEANUP: Sweep OS users just in case they survived the Zivpn cleanup
+CURRENT_DATE_DAYS=$(( $(date +%s) / 86400 ))
+while IFS=':' read -r user pass uid gid info home shell; do
+    if [ "$shell" == "/bin/false" ]; then
+        # Check shadow file for expiration day (field 8)
+        exp_day=$(grep "^${user}:" /etc/shadow | cut -d: -f8)
+        if [[ -n "$exp_day" ]] && [[ "$exp_day" =~ ^[0-9]+$ ]]; then
+            if [ "$CURRENT_DATE_DAYS" -ge "$exp_day" ]; then
+                echo "Linux user '${user}' has expired natively. Cleaning up."
+                pkill -u "$user" &>/dev/null
+                userdel --force "$user" &>/dev/null
+            fi
+        fi
+    fi
+done < /etc/passwd
+
 exit 0
 EOF
     chmod +x /etc/zivpn/expire_check.sh
