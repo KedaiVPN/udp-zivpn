@@ -31,6 +31,7 @@ fi
 echo "Updating expire_check.sh..."
 cat <<'EOF' > /etc/zivpn/expire_check.sh
 #!/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 DB_FILE="/etc/zivpn/users.db"
 CONFIG_FILE="/etc/zivpn/config.json"
 TMP_DB_FILE="${DB_FILE}.tmp"
