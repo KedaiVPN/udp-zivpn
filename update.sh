@@ -338,6 +338,9 @@ sysctl -p /etc/sysctl.d/zivpn.conf > /dev/null 2>&1
 
 CORE_IFACE=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
 if [ -n "$CORE_IFACE" ] && [ -f /etc/systemd/system/zivpn.service ]; then
+    # Modify the boot order so Zivpn always starts after UDPserver to ensure IPTables priority
+    sed -i 's/After=network.target/After=network.target UDPserver.service/g' /etc/systemd/system/zivpn.service
+
     # Remove existing ExecStartPre/Post related to iptables just in case to prevent duplicates
     sed -i '/ExecStartPre=-\/sbin\/iptables/d' /etc/systemd/system/zivpn.service
     sed -i '/ExecStartPost=\/sbin\/iptables/d' /etc/systemd/system/zivpn.service
