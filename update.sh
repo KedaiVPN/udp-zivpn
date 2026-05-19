@@ -27,7 +27,75 @@ if ! command -v jq &> /dev/null || ! command -v curl &> /dev/null; then
     apt-get install -y jq curl > /dev/null 2>&1
 fi
 
-# 3. Update license_checker.sh
+# 3. Update expire_check.sh
+echo "Updating expire_check.sh..."
+cat <<'EOF' > /etc/zivpn/expire_check.sh
+#!/bin/bash
+DB_FILE="/etc/zivpn/users.db"
+CONFIG_FILE="/etc/zivpn/config.json"
+TMP_DB_FILE="${DB_FILE}.tmp"
+CURRENT_DATE=$(date +%s)
+SERVICE_RESTART_NEEDED=false
+
+if [ ! -f "$DB_FILE" ]; then exit 0; fi
+> "$TMP_DB_FILE"
+
+while IFS=':' read -r password expiry_date; do
+    if [[ -z "$password" ]]; then continue; fi
+
+    if ! [[ "$expiry_date" =~ ^[0-9]+$ ]]; then
+        # Preserve invalid entries
+        echo "${password}:${expiry_date}" >> "$TMP_DB_FILE"
+        continue
+    fi
+
+    if [ "$expiry_date" -le "$CURRENT_DATE" ]; then
+        echo "User '${password}' has expired. Deleting permanently."
+        jq --arg pass "$password" 'del(.auth.config[] | select(. == $pass))' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+
+        # Synchronize with Linux user (SocksIP) - SAFE DELETION
+        if id "$password" &>/dev/null; then
+            USER_SHELL=$(getent passwd "$password" | cut -d: -f7)
+            if [ "$USER_SHELL" == "/bin/false" ]; then
+                pkill -u "$password" &>/dev/null
+                userdel --force "$password" &>/dev/null
+            fi
+        fi
+
+        SERVICE_RESTART_NEEDED=true
+    else
+        echo "${password}:${expiry_date}" >> "$TMP_DB_FILE"
+    fi
+done < "$DB_FILE"
+
+mv "$TMP_DB_FILE" "$DB_FILE"
+
+if [ "$SERVICE_RESTART_NEEDED" = true ]; then
+    echo "Restarting zivpn service due to user removal."
+    systemctl restart zivpn.service
+fi
+
+# INDEPENDENT CLEANUP: Sweep OS users just in case they survived the Zivpn cleanup
+CURRENT_DATE_DAYS=$(( $(date +%s) / 86400 ))
+while IFS=':' read -r user pass uid gid info home shell; do
+    if [ "$shell" == "/bin/false" ]; then
+        # Check shadow file for expiration day (field 8)
+        exp_day=$(grep "^${user}:" /etc/shadow | cut -d: -f8)
+        if [[ -n "$exp_day" ]] && [[ "$exp_day" =~ ^[0-9]+$ ]]; then
+            if [ "$CURRENT_DATE_DAYS" -ge "$exp_day" ]; then
+                echo "Linux user '${user}' has expired natively. Cleaning up."
+                pkill -u "$user" &>/dev/null
+                userdel --force "$user" &>/dev/null
+            fi
+        fi
+    fi
+done < /etc/passwd
+
+exit 0
+EOF
+chmod +x /etc/zivpn/expire_check.sh
+
+# 3.5. Update license_checker.sh
 echo "Updating license_checker.sh..."
 cat <<'EOF' > /etc/zivpn/license_checker.sh
 #!/bin/bash
