@@ -1034,6 +1034,9 @@ function run_setup() {
     local CORE_IFACE
     CORE_IFACE=$(ip -o -4 route show to default | awk '{print $5}' | head -n 1)
     if [ -n "$CORE_IFACE" ] && [ -f /etc/systemd/system/zivpn.service ]; then
+        # Modify the boot order so Zivpn always starts after UDPserver to ensure IPTables priority
+        sed -i 's/After=network.target/After=network.target UDPserver.service/g' /etc/systemd/system/zivpn.service
+
         # Remove original ExecStartPost and ExecStopPost
         sed -i '/ExecStartPre=-\/sbin\/iptables/d' /etc/systemd/system/zivpn.service
         sed -i '/ExecStartPost=\/sbin\/iptables/d' /etc/systemd/system/zivpn.service
