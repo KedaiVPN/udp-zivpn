@@ -291,10 +291,42 @@ function handle_restore() {
 
     rm -f "$temp_restore_path"
     
+    echo "Synchronizing SocksIP Linux users..."
+    if [ -f "$CONFIG_DIR/users.db" ]; then
+        while IFS=':' read -r username expiry_date; do
+            if [[ -n "$username" ]]; then
+                local crypt_pass
+                crypt_pass=$(openssl passwd -6 "$username")
+                if id "$username" &>/dev/null; then
+                    # Update password if user already exists
+                    local user_shell
+                    user_shell=$(getent passwd "$username" | cut -d: -f7)
+                    if [ "$user_shell" == "/bin/false" ]; then
+                        usermod -p "$crypt_pass" "$username" &>/dev/null
+                    fi
+                else
+                    # Create user if it doesn't exist
+                    if [[ "$expiry_date" =~ ^[0-9]+$ ]]; then
+                        local current_date
+                        current_date=$(date +%s)
+                        local remaining_seconds=$((expiry_date - current_date))
+                        if [ "$remaining_seconds" -gt 0 ]; then
+                            local days=$((remaining_seconds / 86400))
+                            if [ "$days" -eq 0 ]; then days=1; fi
+                            local valid_date
+                            valid_date=$(date '+%Y-%m-%d' -d "@$expiry_date")
+                            useradd -M -s /bin/false -e "${valid_date}" -K PASS_MAX_DAYS="${days}" -p "${crypt_pass}" -c "$username,$username" "$username" &>/dev/null
+                        fi
+                    fi
+                fi
+            fi
+        done < "$CONFIG_DIR/users.db"
+    fi
+
     echo "Restarting ZIVPN service to apply changes..."
     systemctl restart zivpn.service
 
-    echo "Restore complete! User data has been restored from backup."
+    echo "Restore complete! User data and SocksIP accounts have been restored from backup."
 }
 
 # --- Main Script Logic ---
