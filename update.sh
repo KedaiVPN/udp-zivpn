@@ -416,16 +416,18 @@ if [ -n "$CORE_IFACE" ] && [ -f /etc/systemd/system/zivpn.service ]; then
     sed -i '/ExecStopPost=-\/sbin\/iptables/d' /etc/systemd/system/zivpn.service
 
     # Insert the new rules around ExecStart
-    sed -i "/ExecStart=\/usr\/local\/bin\/zivpn/i ExecStartPre=-/sbin/iptables -t nat -D PREROUTING -i ${CORE_IFACE} -p udp --dport 5667 -j ACCEPT\nExecStartPre=-/sbin/iptables -t nat -D PREROUTING -i ${CORE_IFACE} -p udp --dport 6000:19999 -j DNAT --to-destination :5667" /etc/systemd/system/zivpn.service
+    sed -i "/ExecStart=\/usr\/local\/bin\/zivpn/i ExecStartPre=-/sbin/iptables -t nat -D PREROUTING -i ${CORE_IFACE} -p udp --dport 5667 -j ACCEPT\nExecStartPre=-/sbin/iptables -t nat -D PREROUTING -i ${CORE_IFACE} -p udp --dport 6000:19999 -j DNAT --to-destination :5667\nExecStartPre=-/sbin/iptables -t nat -D PREROUTING -i ${CORE_IFACE} -p udp --dport 553 -j DNAT --to-destination :5667" /etc/systemd/system/zivpn.service
 
     # Use -I PREROUTING 1 to ensure Zivpn intercepts its ports before SocksIP redirects them
-    sed -i "/ExecStart=\/usr\/local\/bin\/zivpn/a ExecStartPost=/sbin/iptables -t nat -I PREROUTING 1 -i ${CORE_IFACE} -p udp --dport 5667 -j ACCEPT\nExecStartPost=/sbin/iptables -t nat -I PREROUTING 1 -i ${CORE_IFACE} -p udp --dport 6000:19999 -j DNAT --to-destination :5667\nExecStopPost=-/sbin/iptables -t nat -D PREROUTING -i ${CORE_IFACE} -p udp --dport 5667 -j ACCEPT\nExecStopPost=-/sbin/iptables -t nat -D PREROUTING -i ${CORE_IFACE} -p udp --dport 6000:19999 -j DNAT --to-destination :5667" /etc/systemd/system/zivpn.service
+    sed -i "/ExecStart=\/usr\/local\/bin\/zivpn/a ExecStartPost=/sbin/iptables -t nat -I PREROUTING 1 -i ${CORE_IFACE} -p udp --dport 5667 -j ACCEPT\nExecStartPost=/sbin/iptables -t nat -I PREROUTING 1 -i ${CORE_IFACE} -p udp --dport 6000:19999 -j DNAT --to-destination :5667\nExecStartPost=/sbin/iptables -t nat -I PREROUTING 1 -i ${CORE_IFACE} -p udp --dport 553 -j DNAT --to-destination :5667\nExecStopPost=-/sbin/iptables -t nat -D PREROUTING -i ${CORE_IFACE} -p udp --dport 5667 -j ACCEPT\nExecStopPost=-/sbin/iptables -t nat -D PREROUTING -i ${CORE_IFACE} -p udp --dport 6000:19999 -j DNAT --to-destination :5667\nExecStopPost=-/sbin/iptables -t nat -D PREROUTING -i ${CORE_IFACE} -p udp --dport 553 -j DNAT --to-destination :5667" /etc/systemd/system/zivpn.service
 
     # Ensure current iptables are clean and set (if service is already running)
     iptables -t nat -D PREROUTING -i "${CORE_IFACE}" -p udp --dport 6000:19999 -j DNAT --to-destination :5667 > /dev/null 2>&1 || true
+    iptables -t nat -D PREROUTING -i "${CORE_IFACE}" -p udp --dport 553 -j DNAT --to-destination :5667 > /dev/null 2>&1 || true
     iptables -t nat -D PREROUTING -i "${CORE_IFACE}" -p udp --dport 5667 -j ACCEPT > /dev/null 2>&1 || true
     iptables -t nat -I PREROUTING 1 -i "${CORE_IFACE}" -p udp --dport 5667 -j ACCEPT > /dev/null 2>&1 || true
     iptables -t nat -I PREROUTING 1 -i "${CORE_IFACE}" -p udp --dport 6000:19999 -j DNAT --to-destination :5667 > /dev/null 2>&1 || true
+    iptables -t nat -I PREROUTING 1 -i "${CORE_IFACE}" -p udp --dport 553 -j DNAT --to-destination :5667 > /dev/null 2>&1 || true
 fi
 
 # 6. Update Manager Menu (install.sh -> zivpn-manager)
@@ -463,7 +465,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/root
-ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas} -exclude=5667,5888,5890,7000,7100,7200,7300 -mode=system
+ExecStart=/usr/bin/udpServer -ip=${ip_publica} -net=${interfas} -exclude=553,5667,5888,5890,7000,7100,7200,7300 -mode=system
 Restart=always
 RestartSec=3s
 
